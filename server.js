@@ -161,10 +161,7 @@ process.on("SIGTERM", () => {
 
 logActivity("system", "RouterFarm dashboard starting");
 reconcilePrepState();
-refreshDevices();
 refreshRouters();
-refreshRouterHealth();
-safeRefreshRoutingAudit();
 processPrepQueue();
 setInterval(refreshDevices, settings.pollIntervalMs || 5000);
 setInterval(refreshRouters, settings.routerRefreshIntervalMs || 20000);
@@ -267,6 +264,13 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(settings.port, settings.host, () => {
   logActivity("system", `Dashboard listening on http://${settings.host}:${settings.port}`);
+  setTimeout(() => {
+    refreshDevices();
+    safeRefreshRoutingAudit();
+  }, 50);
+  setTimeout(() => {
+    refreshRouterHealth();
+  }, 250);
 });
 
 function cleanupPid() {
