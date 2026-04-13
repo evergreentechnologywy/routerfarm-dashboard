@@ -36,7 +36,14 @@ function Write-Result {
 function Invoke-SshCommand {
   param([string]$Command)
 
-  $sshArgs = @("-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes", "-p", "$sshPort")
+  $sshArgs = @(
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "BatchMode=yes",
+    "-o", "ConnectTimeout=$commandTimeout",
+    "-o", "HostKeyAlgorithms=+ssh-rsa",
+    "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa",
+    "-p", "$sshPort"
+  )
   if ($router.sshKeyPath) {
     $sshArgs += @("-i", [string]$router.sshKeyPath)
   }

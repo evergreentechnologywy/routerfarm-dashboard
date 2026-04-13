@@ -63,11 +63,14 @@ Start-Sleep -Seconds 2
 $escapedSsid = '"' + $Ssid.Replace('"', '\"') + '"'
 $escapedPassword = '"' + $Password.Replace('"', '\"') + '"'
 
-$commands = @(
-  @("shell", "cmd", "wifi", "connect-network", "wpa2", $Ssid, $Password),
-  @("shell", "cmd", "-w", "wifi", "connect-network", "wpa2", $Ssid, $Password),
-  @("shell", "am", "start", "-a", "android.settings.WIFI_SETTINGS")
-)
+$commands = @()
+if ([string]::IsNullOrWhiteSpace($Password)) {
+  $commands += ,@("shell", "cmd", "wifi", "connect-network", "open", $Ssid)
+  $commands += ,@("shell", "cmd", "-w", "wifi", "connect-network", "open", $Ssid)
+}
+$commands += ,@("shell", "cmd", "wifi", "connect-network", "wpa2", $Ssid, $Password)
+$commands += ,@("shell", "cmd", "-w", "wifi", "connect-network", "wpa2", $Ssid, $Password)
+$commands += ,@("shell", "am", "start", "-a", "android.settings.WIFI_SETTINGS")
 
 foreach ($command in $commands) {
   $result = Invoke-Adb -Arguments (@("-s", $Serial) + $command)

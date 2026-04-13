@@ -71,6 +71,11 @@ const DEFAULT_SETTINGS = {
     reconnectPhoneAfterRouterRestart: true,
     reconnectWaitMs: 8000
   },
+  deviceRouting: {
+    autoAssignRouterOnDiscovery: true,
+    autoConnectRouterWifiOnDiscovery: false,
+    autoConnectCooldownMs: 300000
+  },
   ipReusePolicy: {
     historyLimit: 100,
     maxAgeHours: 72,
@@ -130,6 +135,7 @@ let deviceIpHistory = loadJson(DEVICE_IP_HISTORY_PATH, DEFAULT_IP_HISTORY);
 const missingTools = new Set();
 const sessions = new Map();
 const ipCheckPromises = new Map();
+const autoRouterConnectInFlight = new Set();
 
 ensureDirectories();
 writeJsonIfMissing(SETTINGS_PATH, settings);
@@ -651,6 +657,146 @@ function ensureDeviceNumberAssignment(serial) {
   });
 }
 
+function getRouterAssignmentSummary() {
+  const summary = new Map();
+  for (const router of listConfiguredRouters()) {
+    summary.set(router.id, []);
+  }
+  for (const device of devicesConfig.devices || []) {
+    const routerId = String(device.routerId || "");
+    if (!routerId || !summary.has(routerId)) {
+      continue;
+    }
+    summary.get(routerId).push(device);
+  }
+  return summary;
+}
+
+function assignPersistentRouterToDevice(serial) {
+  const existing = getDeviceConfig(serial);
+  if (existing.routerId) {
+    return existing;
+  }
+
+  const routingSettings = settings.deviceRouting || DEFAULT_SETTINGS.deviceRouting;
+  if (routingSettings.autoAssignRouterOnDiscovery === false) {
+    return existing;
+  }
+
+  const routers = listConfiguredRouters().filter(router => router.enabled !== false);
+  const assignments = getRouterAssignmentSummary();
+  let selectedRouter = null;
+  let selectedSlot = null;
+  let selectedLoad = Number.MAX_SAFE_INTEGER;
+
+  for (const router of routers) {
+    const assignedDevices = assignments.get(router.id) || [];
+    const maxAssigned = Number(router.maxAssignedDevices) || 4;
+    if (assignedDevices.length >= maxAssigned) {
+      continue;
+    }
+    const usedSlots = new Set(
+      assignedDevices
+        .map(device => parsePositiveIntegerOrNull(device.routerSlot))
+        .filter(Boolean)
+    );
+    let candidateSlot = 1;
+    while (usedSlots.has(candidateSlot)) {
+      candidateSlot += 1;
+    }
+    if (assignedDevices.length < selectedLoad) {
+      selectedRouter = router;
+      selectedSlot = candidateSlot;
+      selectedLoad = assignedDevices.length;
+    }
+  }
+
+  if (!selectedRouter) {
+    return existing;
+  }
+
+  const patched = upsertDeviceConfig(serial, {
+    role: existing.role === "sim-direct" ? "router-client" : existing.role,
+    routerId: selectedRouter.id,
+    routerSlot: selectedSlot
+  });
+  logActivity("routing", `Assigned ${patched.nickname || serial} to ${selectedRouter.label || selectedRouter.id} slot ${selectedSlot}`, serial);
+  return patched;
+}
+
+function ensurePermanentDeviceAssignment(serial) {
+  ensureDeviceNumberAssignment(serial);
+  return assignPersistentRouterToDevice(serial);
+}
+
+function shouldAutoConnectRouterWifi(serial, row, metadata, previousDevice) {
+  const routingSettings = settings.deviceRouting || DEFAULT_SETTINGS.deviceRouting;
+  if (routingSettings.autoConnectRouterWifiOnDiscovery === false) {
+    return false;
+  }
+  if (row.state !== "device" || !metadata?.routerId) {
+    return false;
+  }
+  if (autoRouterConnectInFlight.has(serial)) {
+    return false;
+  }
+
+  const currentState = state.devices?.[serial] || {};
+  const cooldownMs = Number(routingSettings.autoConnectCooldownMs) || 300000;
+  const lastAttemptAt = new Date(currentState.routerAutoConnectLastAttemptAt || 0).getTime();
+  if (Date.now() - lastAttemptAt < cooldownMs) {
+    return false;
+  }
+  if (!previousDevice || previousDevice.adbState !== "device") {
+    return true;
+  }
+  if (String(previousDevice.routerId || "") !== String(metadata.routerId || "")) {
+    return true;
+  }
+  return !currentState.routerAutoConnectLastAttemptAt;
+}
+
+function scheduleAutoRouterWifiConnect(serial, router) {
+  if (!router || autoRouterConnectInFlight.has(serial)) {
+    return;
+  }
+
+  autoRouterConnectInFlight.add(serial);
+  const attemptedAt = new Date().toISOString();
+  updateDeviceState(serial, {
+    routerAutoConnectLastAttemptAt: attemptedAt,
+    routerAutoConnectStatus: "pending",
+    prepMessage: `Auto-connecting to ${router.label || router.id}`
+  });
+
+  setTimeout(() => {
+    try {
+      const connectResult = connectPhoneToRouter(serial, router);
+      updateDeviceState(serial, {
+        routerAutoConnectLastAttemptAt: attemptedAt,
+        routerAutoConnectStatus: connectResult.ok ? (connectResult.manualAssist ? "manual-assist" : "connected") : "failed",
+        routerAutoConnectLastResult: connectResult.payload?.message || connectResult.error || "",
+        prepMessage: connectResult.ok
+          ? (connectResult.manualAssist
+              ? `Auto-connect opened Wi-Fi settings for ${router.label || router.id}`
+              : `Auto-connected to ${router.label || router.id}`)
+          : (connectResult.error || `Auto-connect failed for ${router.label || router.id}`)
+      });
+      logActivity(
+        "router-connect",
+        connectResult.ok
+          ? (connectResult.manualAssist
+              ? `${serial} needs manual Wi-Fi completion for ${router.label || router.id}`
+              : `${serial} auto-connected to ${router.label || router.id}`)
+          : `${serial} auto-connect failed for ${router.label || router.id}: ${connectResult.error || "unknown error"}`,
+        serial
+      );
+    } finally {
+      autoRouterConnectInFlight.delete(serial);
+    }
+  }, 250);
+}
+
 function buildStatus(user) {
   const routingAudit = loadRoutingAudit();
   const routingGuard = buildRoutingGuard(routingAudit);
@@ -888,10 +1034,14 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     }
     const verification = await runDevicePublicIpCheck(serial, "pre-session");
     if (!verification.success) {
+      setDeviceWifiState(serial, false);
+      updateDeviceState(serial, { prepMessage: "IP verification failed and Wi-Fi was disabled" });
       return sendJson(res, 409, { error: verification.error || "IP verification failed; session not started" });
     }
     if (verification.publicIp?.reusePolicyViolation && getIpReusePolicy().blockSessionStartOnReuse) {
       const routerLabel = knownDevice.routerLabel || knownDevice.routerId || "assigned router";
+      setDeviceWifiState(serial, false);
+      updateDeviceState(serial, { prepMessage: "Reused IP detected; Wi-Fi was disabled pending a new attempt" });
       return sendJson(res, 409, {
         error: `Session start blocked: ${verification.publicIp.currentIp} was already used within the last ${verification.publicIp.reusePolicyWindowHours} hours. Reset ${routerLabel} and verify a fresh IP before starting.`,
         ipCheck: verification.publicIp
@@ -919,6 +1069,8 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     }
     runPowerShellScript("stop-scrcpy-for-device.ps1", stopArgs, { detached: true, windowsHide: false });
     updateDeviceState(serial, { sessionState: "stopped", sessionStoppedAt: new Date().toISOString() });
+    setDeviceWifiState(serial, false);
+    updateDeviceState(serial, { prepMessage: "Session stopped and Wi-Fi disabled" });
     logActivity("session", `Session stopped by ${user.username} and scrcpy close requested`, serial);
     return sendJson(res, 200, { ok: true });
   }
@@ -1100,6 +1252,20 @@ function connectPhoneToRouter(serial, router) {
   };
 }
 
+function setDeviceWifiState(serial, enabled) {
+  const script = runPowerShellScript(
+    "set-device-wifi-state.ps1",
+    ["-Serial", serial, "-State", enabled ? "enable" : "disable", "-SettingsPath", SETTINGS_PATH],
+    { detached: false, timeout: 20000 }
+  );
+  const payload = parseJsonPayload(script.stdout);
+  return {
+    ok: script.status === 0 && payload?.ok !== false,
+    payload,
+    error: payload?.message || String(script.stderr || script.stdout || "").trim() || `Failed to ${enabled ? "enable" : "disable"} Wi-Fi.`
+  };
+}
+
 async function enforceRouterRestartBeforeSession(serial, user, device) {
   const policy = settings.sessionPolicy || DEFAULT_SETTINGS.sessionPolicy;
   if (!policy.restartRouterBeforeSession) {
@@ -1269,7 +1435,7 @@ function refreshDevices() {
 
   for (const row of rows) {
     const stored = state.devices[row.serial] || {};
-    const metadata = ensureDeviceNumberAssignment(row.serial);
+    const metadata = ensurePermanentDeviceAssignment(row.serial);
     const fallbackNetwork = {
       ipAddress: "",
       interface: "",
@@ -1334,6 +1500,9 @@ function refreshDevices() {
     const previousState = previous[row.serial]?.adbState;
     if (previousState && previousState !== row.state) {
       logActivity("device", `ADB state changed from ${previousState} to ${row.state}`, row.serial);
+    }
+    if (shouldAutoConnectRouterWifi(row.serial, row, metadata, previous[row.serial])) {
+      scheduleAutoRouterWifiConnect(row.serial, metadata.routerId ? getRouterConfig(metadata.routerId) : null);
     }
   }
 

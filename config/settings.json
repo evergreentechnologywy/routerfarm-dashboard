@@ -33,6 +33,11 @@
     "reconnectPhoneAfterRouterRestart": true,
     "reconnectWaitMs": 8000
   },
+  "deviceRouting": {
+    "autoAssignRouterOnDiscovery": true,
+    "autoConnectRouterWifiOnDiscovery": false,
+    "autoConnectCooldownMs": 300000
+  },
   "ipReusePolicy": {
     "historyLimit": 100,
     "maxAgeHours": 72,
