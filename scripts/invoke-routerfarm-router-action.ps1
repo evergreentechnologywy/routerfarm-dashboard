@@ -110,12 +110,18 @@ if (-not $routerCommand) {
 $telemetryCommands = @{
   "board" = "ubus call system board"
   "wan" = "ifstatus wan"
+  "wwan" = "ifstatus wwan"
+  "route" = "ip route"
+  "networkConfig" = "cat /etc/config/network"
   "publicIp" = "sh -c 'if command -v curl >/dev/null 2>&1; then curl -fsSL https://api.ipify.org; elif command -v uclient-fetch >/dev/null 2>&1; then uclient-fetch -qO- https://api.ipify.org; elif command -v wget >/dev/null 2>&1; then wget -qO- https://api.ipify.org; else echo no-http-client; fi'"
 }
 
 if ($Action -eq "router-health") {
   $boardResult = Invoke-SshCommand -Command $telemetryCommands.board
   $wanResult = Invoke-SshCommand -Command $telemetryCommands.wan
+  $wwanResult = Invoke-SshCommand -Command $telemetryCommands.wwan
+  $routeResult = Invoke-SshCommand -Command $telemetryCommands.route
+  $networkConfigResult = Invoke-SshCommand -Command $telemetryCommands.networkConfig
   $publicIpResult = Invoke-SshCommand -Command $telemetryCommands.publicIp
 
   if ($boardResult.ExitCode -ne 0) {
@@ -127,6 +133,9 @@ if ($Action -eq "router-health") {
       telemetry = @{
         board = $boardResult.Output
         wan = $wanResult.Output
+        wwan = $wwanResult.Output
+        route = $routeResult.Output
+        networkConfig = $networkConfigResult.Output
         publicIp = $publicIpResult.Output
       }
     }
@@ -134,10 +143,16 @@ if ($Action -eq "router-health") {
   }
 
   $wanJson = $null
+  $wwanJson = $null
   try {
     $wanJson = $wanResult.Output | ConvertFrom-Json -ErrorAction Stop
   } catch {
     $wanJson = $null
+  }
+  try {
+    $wwanJson = $wwanResult.Output | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    $wwanJson = $null
   }
 
   $publicIp = ($publicIpResult.Output -split '\r?\n' | Select-Object -First 1).Trim()
@@ -148,13 +163,34 @@ if ($Action -eq "router-health") {
   $wanUp = $false
   $wanAddress = ""
   $wanDevice = ""
-  if ($wanJson) {
+  $uplinkInterface = ""
+  $uplinkMode = "unknown"
+  $uplinkRaw = ""
+
+  if ($wwanJson -and -not $wwanJson.errors) {
+    $wanUp = [bool]$wwanJson.up
+    $wanDevice = [string]$wwanJson.device
+    $firstIpv4 = @($wwanJson."ipv4-address")[0]
+    if ($firstIpv4 -and $firstIpv4.address) {
+      $wanAddress = [string]$firstIpv4.address
+    }
+    $uplinkInterface = "wwan"
+    $uplinkMode = "router-uplink"
+    $uplinkRaw = $wwanResult.Output
+  } elseif ($wanJson -and -not $wanJson.errors) {
     $wanUp = [bool]$wanJson.up
     $wanDevice = [string]$wanJson.device
     $firstIpv4 = @($wanJson."ipv4-address")[0]
     if ($firstIpv4 -and $firstIpv4.address) {
       $wanAddress = [string]$firstIpv4.address
     }
+    $uplinkInterface = "wan"
+    $uplinkMode = "router-uplink"
+    $uplinkRaw = $wanResult.Output
+  } else {
+    $uplinkInterface = "lan"
+    $uplinkMode = "bridge-or-ap"
+    $uplinkRaw = $routeResult.Output
   }
 
   Write-Result -Success:$true -Message "Router health probe completed." -Extra @{
@@ -163,10 +199,16 @@ if ($Action -eq "router-health") {
     telemetry = @{
       board = $boardResult.Output
       wan = $wanResult.Output
+      wwan = $wwanResult.Output
+      route = $routeResult.Output
+      networkConfig = $networkConfigResult.Output
       publicIp = $publicIp
       wanUp = $wanUp
       wanAddress = $wanAddress
       wanDevice = $wanDevice
+      uplinkInterface = $uplinkInterface
+      uplinkMode = $uplinkMode
+      uplinkRaw = $uplinkRaw
     }
   }
   exit 0

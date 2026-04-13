@@ -1033,6 +1033,16 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     if (!restartGate.ok) {
       return sendJson(res, 409, { error: restartGate.error || "Router restart gate failed", detail: restartGate.detail || null });
     }
+    const refreshedDevice = deviceCache[serial] || buildMissingDevice(serial);
+    if (!deviceLooksOnRouterWifi(refreshedDevice)) {
+      setDeviceWifiState(serial, false);
+      updateDeviceState(serial, {
+        prepMessage: `Phone did not land on router Wi-Fi after reconnect; current interface is ${refreshedDevice.network?.interface || "unknown"}`
+      });
+      return sendJson(res, 409, {
+        error: `Session start blocked: phone is not using router Wi-Fi after reconnect. Current interface: ${refreshedDevice.network?.interface || "unknown"}.`
+      });
+    }
     const verification = await runDevicePublicIpCheck(serial, "pre-session");
     if (!verification.success) {
       setDeviceWifiState(serial, false);
@@ -2509,6 +2519,11 @@ function buildActivationLock(device, activeSession = getActiveSession()) {
   };
 }
 
+function deviceLooksOnRouterWifi(device) {
+  const interfaceName = String(device?.network?.interface || "").toLowerCase();
+  return interfaceName.startsWith("wlan") || interfaceName.includes("wifi");
+}
+
 function buildRoutingGuard(routingAudit) {
   const hardBlockChecks = new Set([
     "RouterFarm Bind Mode",
@@ -2577,6 +2592,13 @@ function normalizePublicIpState(serial, publicIp) {
 
 function getDeviceRoutingRisk(device, routingAudit, routingGuard = buildRoutingGuard(routingAudit)) {
   const interfaceName = String(device.network?.interface || "").toLowerCase();
+  if (device.routerId && device.online && interfaceName && !deviceLooksOnRouterWifi(device)) {
+    return {
+      level: "warning",
+      label: "Not On Router Wi-Fi",
+      detail: `Device network is using ${device.network?.interface || "an unexpected interface"} instead of router Wi-Fi.`
+    };
+  }
   if (interfaceName === "lo" || interfaceName === "loopback") {
     return {
       level: "critical",
