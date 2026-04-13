@@ -33,6 +33,30 @@ function Write-Result {
   $payload | ConvertTo-Json -Depth 6 -Compress
 }
 
+function Invoke-SshCommand {
+  param([string]$Command)
+
+  $sshArgs = @("-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes", "-p", "$sshPort")
+  if ($router.sshKeyPath) {
+    $sshArgs += @("-i", [string]$router.sshKeyPath)
+  }
+  $sshArgs += @("$username@$routerHost", $Command)
+
+  try {
+    $result = & $sshPath @sshArgs 2>&1
+    $exitCode = $LASTEXITCODE
+    return [pscustomobject]@{
+      ExitCode = $exitCode
+      Output = [string]($result | Out-String).Trim()
+    }
+  } catch {
+    return [pscustomobject]@{
+      ExitCode = 1
+      Output = $_.Exception.Message
+    }
+  }
+}
+
 if (-not (Test-Path -LiteralPath $RoutersPath)) {
   Write-Result -Success:$false -Message "Routers config was not found." 
   exit 1
@@ -76,34 +100,84 @@ if (-not $routerCommand) {
   exit 1
 }
 
-$sshArgs = @("-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes", "-p", "$sshPort")
-if ($router.sshKeyPath) {
-  $sshArgs += @("-i", [string]$router.sshKeyPath)
+$telemetryCommands = @{
+  "board" = "ubus call system board"
+  "wan" = "ifstatus wan"
+  "publicIp" = "sh -c 'if command -v curl >/dev/null 2>&1; then curl -fsSL https://api.ipify.org; elif command -v uclient-fetch >/dev/null 2>&1; then uclient-fetch -qO- https://api.ipify.org; elif command -v wget >/dev/null 2>&1; then wget -qO- https://api.ipify.org; else echo no-http-client; fi'"
 }
-$sshArgs += @("$username@$routerHost", $routerCommand)
 
-try {
-  $result = & $sshPath @sshArgs 2>&1
-  $exitCode = $LASTEXITCODE
-  if ($exitCode -ne 0) {
+if ($Action -eq "router-health") {
+  $boardResult = Invoke-SshCommand -Command $telemetryCommands.board
+  $wanResult = Invoke-SshCommand -Command $telemetryCommands.wan
+  $publicIpResult = Invoke-SshCommand -Command $telemetryCommands.publicIp
+
+  if ($boardResult.ExitCode -ne 0) {
     Write-Result -Success:$false -Message "SSH command failed." -Extra @{
       host = $routerHost
-      exitCode = $exitCode
-      detail = [string]($result | Out-String).Trim()
+      exitCode = $boardResult.ExitCode
+      detail = $boardResult.Output
       requiresConfiguration = $true
+      telemetry = @{
+        board = $boardResult.Output
+        wan = $wanResult.Output
+        publicIp = $publicIpResult.Output
+      }
     }
     exit 1
   }
 
-  Write-Result -Success:$true -Message "Router action completed." -Extra @{
+  $wanJson = $null
+  try {
+    $wanJson = $wanResult.Output | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    $wanJson = $null
+  }
+
+  $publicIp = ($publicIpResult.Output -split '\r?\n' | Select-Object -First 1).Trim()
+  if ($publicIp -eq "no-http-client") {
+    $publicIp = ""
+  }
+
+  $wanUp = $false
+  $wanAddress = ""
+  $wanDevice = ""
+  if ($wanJson) {
+    $wanUp = [bool]$wanJson.up
+    $wanDevice = [string]$wanJson.device
+    $firstIpv4 = @($wanJson."ipv4-address")[0]
+    if ($firstIpv4 -and $firstIpv4.address) {
+      $wanAddress = [string]$firstIpv4.address
+    }
+  }
+
+  Write-Result -Success:$true -Message "Router health probe completed." -Extra @{
     host = $routerHost
-    detail = [string]($result | Out-String).Trim()
+    detail = $boardResult.Output
+    telemetry = @{
+      board = $boardResult.Output
+      wan = $wanResult.Output
+      publicIp = $publicIp
+      wanUp = $wanUp
+      wanAddress = $wanAddress
+      wanDevice = $wanDevice
+    }
   }
   exit 0
-} catch {
-  Write-Result -Success:$false -Message $_.Exception.Message -Extra @{
+}
+
+$result = Invoke-SshCommand -Command $routerCommand
+if ($result.ExitCode -ne 0) {
+  Write-Result -Success:$false -Message "SSH command failed." -Extra @{
     host = $routerHost
+    exitCode = $result.ExitCode
+    detail = $result.Output
     requiresConfiguration = $true
   }
   exit 1
 }
+
+Write-Result -Success:$true -Message "Router action completed." -Extra @{
+  host = $routerHost
+  detail = $result.Output
+}
+exit 0

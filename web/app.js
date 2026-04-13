@@ -334,6 +334,9 @@ function buildRoutersSignature(routers) {
     router.activeDeviceSerial || "",
     router.routerState?.healthStatus || "",
     router.routerState?.lastCheckedAt || "",
+    router.routerState?.lastRestartAt || "",
+    router.routerState?.wanAddress || "",
+    router.routerState?.publicIp || "",
     router.routerState?.detail || "",
     router.ssid || "",
     router.mobileUplinkId || ""
@@ -729,7 +732,7 @@ function renderRouters(routers) {
   routerCount.textContent = `${routers.length} routers`;
   routerGrid.innerHTML = "";
   if (!routers.length) {
-    routerGrid.innerHTML = `<div class="empty-state">No Opal routers are configured yet.</div>`;
+    routerGrid.innerHTML = `<div class="empty-state">No routers are configured yet.</div>`;
     return;
   }
 
@@ -758,10 +761,15 @@ function renderRouters(routers) {
         <div><span>Uplink</span><strong>${escapeHtml(router.mobileUplinkId || "Not set")}</strong></div>
         <div><span>Reachability</span><strong>${escapeHtml(buildRouterReachability(router))}</strong></div>
         <div><span>Last Check</span><strong>${escapeHtml(router.routerState?.lastCheckedAt ? formatShortTime(router.routerState.lastCheckedAt) : "Not checked")}</strong></div>
+        <div><span>WAN</span><strong>${escapeHtml(router.routerState?.wanUp ? "Up" : "Unknown")}${router.routerState?.wanDevice ? ` via ${escapeHtml(router.routerState.wanDevice)}` : ""}</strong></div>
+        <div><span>WAN Address</span><strong class="table-code">${escapeHtml(router.routerState?.wanAddress || "Unknown")}</strong></div>
+        <div><span>Router Public IP</span><strong class="table-code">${escapeHtml(router.routerState?.publicIp || "Unknown")}</strong></div>
+        <div><span>Last Restart</span><strong>${escapeHtml(router.routerState?.lastRestartAt ? formatShortTime(router.routerState.lastRestartAt) : "Never")}</strong></div>
       </div>
       <div class="table-subline">${escapeHtml(router.routerState?.detail || "No router health detail yet.")}</div>
       <div class="router-actions">
         <button class="button button-secondary" type="button" data-router-action="router-health">Health</button>
+        <button class="button button-secondary" type="button" data-router-action="reboot-router">Reboot</button>
         <button class="button button-secondary" type="button" data-router-action="wan-reconnect">Reconnect WAN</button>
         <button class="button button-secondary" type="button" data-router-action="restart-wifi">Restart Wi-Fi</button>
         <button class="button button-secondary" type="button" data-router-action="cycle-uplink">Cycle Uplink</button>

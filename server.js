@@ -541,10 +541,16 @@ function buildRouterStatuses(visibleDevices) {
       routerState: {
         lastAction: routerState.lastAction || "",
         lastResult: routerState.lastResult || "",
+        lastRestartAt: routerState.lastRestartAt || "",
         lastCheckedAt: routerState.lastCheckedAt || "",
         healthStatus: routerState.healthStatus || "unknown",
         detail: routerState.detail || "",
-        reachability: routerState.reachability || { ssh: false, http: false, https: false }
+        reachability: routerState.reachability || { ssh: false, http: false, https: false },
+        wanUp: Boolean(routerState.wanUp),
+        wanAddress: routerState.wanAddress || "",
+        wanDevice: routerState.wanDevice || "",
+        publicIp: routerState.publicIp || "",
+        telemetryCheckedAt: routerState.telemetryCheckedAt || ""
       }
     };
   });
@@ -1042,7 +1048,12 @@ function executeRouterAction(routerId, action, body) {
     lastCheckedAt: new Date().toISOString(),
     lastRestartAt: action === "reboot-router" && ok ? new Date().toISOString() : (state.routers?.[routerId]?.lastRestartAt || ""),
     healthStatus: action === "router-health" ? (ok ? "online" : "degraded") : ((state.routers?.[routerId]?.healthStatus) || "unknown"),
-    detail: payload?.detail || payload?.message || String(script.stderr || "").trim()
+    detail: payload?.detail || payload?.message || String(script.stderr || "").trim(),
+    wanUp: payload?.telemetry?.wanUp === undefined ? Boolean(state.routers?.[routerId]?.wanUp) : Boolean(payload?.telemetry?.wanUp),
+    wanAddress: payload?.telemetry?.wanAddress || state.routers?.[routerId]?.wanAddress || "",
+    wanDevice: payload?.telemetry?.wanDevice || state.routers?.[routerId]?.wanDevice || "",
+    publicIp: payload?.telemetry?.publicIp || state.routers?.[routerId]?.publicIp || "",
+    telemetryCheckedAt: action === "router-health" ? new Date().toISOString() : (state.routers?.[routerId]?.telemetryCheckedAt || "")
   };
   state.routers[routerId] = nextState;
   saveState();
