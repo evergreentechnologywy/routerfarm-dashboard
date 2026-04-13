@@ -57,11 +57,14 @@ function pathExists(targetPath) {
 }
 
 function resolveWorkspaceRoot() {
+  const bundledRoot = path.join(__dirname, "..");
+  const resourcesAppRoot = process.resourcesPath ? path.join(process.resourcesPath, "app") : "";
   const candidates = [
     process.env.ROUTERFARM_ROOT,
     process.env.PHONEFARM_ROOT,
-    DEFAULT_WORKSPACE_ROOT,
-    path.join(__dirname, "..")
+    bundledRoot,
+    resourcesAppRoot,
+    DEFAULT_WORKSPACE_ROOT
   ].filter(Boolean);
 
   for (const candidate of candidates) {

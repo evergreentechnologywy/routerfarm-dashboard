@@ -60,11 +60,14 @@ if ([string]::IsNullOrWhiteSpace($routerHost)) {
 }
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $backupPath = "/tmp/routerfarm-pre-$Mode-$timestamp.tgz"
+$remotePayloadPath = "/tmp/routerfarm-netmode-$timestamp.json"
+$rpcPayload = '{"jsonrpc":"2.0","method":"call","params":["","netmode","set_mode",{"mode":"__MODE__"}],"id":1}'.Replace("__MODE__", $Mode)
 
 $remoteCommand = @(
   "set -e"
+  "printf '%s' '$rpcPayload' > '$remotePayloadPath'"
   "if [ '$($SkipBackup.IsPresent.ToString().ToLower())' != 'true' ]; then tar -czf '$backupPath' /etc/config/network /etc/config/wireless /etc/config/firewall /etc/config/glconfig >/dev/null 2>&1 || true; fi"
-  "curl -H 'glinet: 1' -s -k http://127.0.0.1/rpc -d '{\"jsonrpc\":\"2.0\",\"method\":\"call\",\"params\":[\"\",\"netmode\",\"set_mode\",{\"mode\":\"$Mode\"}],\"id\":1}'"
+  "curl -H 'glinet: 1' -H 'Content-Type: application/json' -s -k http://127.0.0.1/rpc --data-binary '@$remotePayloadPath'"
   "sleep 3"
   "uci -q get glconfig.general.mode"
 ) -join "; "
@@ -85,7 +88,7 @@ try {
   $exitCode = $LASTEXITCODE
   $text = [string]($output | Out-String).Trim()
   if ($exitCode -ne 0) {
-    Write-Result -Success:$false -Message "Router mode change failed." -Extra @{ host = $routerHost; detail = $text; backupPath = $backupPath }
+    Write-Result -Success:$false -Message "Router mode change failed." -Extra @{ host = $routerHost; detail = $text; backupPath = $backupPath; payloadPath = $remotePayloadPath }
     exit 1
   }
 
@@ -96,9 +99,10 @@ try {
     reportedMode = $reportedMode
     detail = $text
     backupPath = $backupPath
+    payloadPath = $remotePayloadPath
   }
   exit 0
 } catch {
-  Write-Result -Success:$false -Message "Router mode change failed." -Extra @{ host = $routerHost; detail = $_.Exception.Message; backupPath = $backupPath }
+  Write-Result -Success:$false -Message "Router mode change failed." -Extra @{ host = $routerHost; detail = $_.Exception.Message; backupPath = $backupPath; payloadPath = $remotePayloadPath }
   exit 1
 }

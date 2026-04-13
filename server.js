@@ -127,6 +127,7 @@ let preparingSerial = null;
 let deviceCache = {};
 let routerCache = {};
 let routerHealthRefreshInFlight = false;
+let deviceRefreshInFlight = false;
 let lastRoutingAuditAt = 0;
 let stateSaveTimer = null;
 let routingAuditCache = null;
@@ -773,9 +774,9 @@ function scheduleAutoRouterWifiConnect(serial, router) {
     prepMessage: `Auto-connecting to ${router.label || router.id}`
   });
 
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
-      const connectResult = connectPhoneToRouter(serial, router);
+      const connectResult = await connectPhoneToRouterAsync(serial, router);
       updateDeviceState(serial, {
         routerAutoConnectLastAttemptAt: attemptedAt,
         routerAutoConnectStatus: connectResult.ok ? (connectResult.manualAssist ? "manual-assist" : "connected") : "failed",
@@ -1038,7 +1039,7 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     }
     const refreshedDevice = deviceCache[serial] || buildMissingDevice(serial);
     if (!deviceLooksOnRouterWifi(refreshedDevice)) {
-      setDeviceWifiState(serial, false);
+      await setDeviceWifiStateAsync(serial, false);
       updateDeviceState(serial, {
         prepMessage: `Phone did not land on router Wi-Fi after reconnect; current interface is ${refreshedDevice.network?.interface || "unknown"}`
       });
@@ -1048,13 +1049,13 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     }
     const verification = await runDevicePublicIpCheck(serial, "pre-session");
     if (!verification.success) {
-      setDeviceWifiState(serial, false);
+      await setDeviceWifiStateAsync(serial, false);
       updateDeviceState(serial, { prepMessage: "IP verification failed and Wi-Fi was disabled" });
       return sendJson(res, 409, { error: verification.error || "IP verification failed; session not started" });
     }
     if (verification.publicIp?.reusePolicyViolation && getIpReusePolicy().blockSessionStartOnReuse) {
       const routerLabel = knownDevice.routerLabel || knownDevice.routerId || "assigned router";
-      setDeviceWifiState(serial, false);
+      await setDeviceWifiStateAsync(serial, false);
       updateDeviceState(serial, { prepMessage: "Reused IP detected; Wi-Fi was disabled pending a new attempt" });
       return sendJson(res, 409, {
         error: `Session start blocked: ${verification.publicIp.currentIp} was already used within the last ${verification.publicIp.reusePolicyWindowHours} hours. Reset ${routerLabel} and verify a fresh IP before starting.`,
@@ -1083,7 +1084,7 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     }
     runPowerShellScript("stop-scrcpy-for-device.ps1", stopArgs, { detached: true, windowsHide: false });
     updateDeviceState(serial, { sessionState: "stopped", sessionStoppedAt: new Date().toISOString() });
-    setDeviceWifiState(serial, false);
+    await setDeviceWifiStateAsync(serial, false);
     updateDeviceState(serial, { prepMessage: "Session stopped and Wi-Fi disabled" });
     logActivity("session", `Session stopped by ${user.username} and scrcpy close requested`, serial);
     return sendJson(res, 200, { ok: true });
@@ -1094,7 +1095,7 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     if (!router) {
       return sendJson(res, 409, { error: "Assign this phone to a router before connecting." });
     }
-    const connectResult = connectPhoneToRouter(serial, router);
+    const connectResult = await connectPhoneToRouterAsync(serial, router);
     if (!connectResult.ok) {
       const errorMessage = connectResult.error || "Phone-to-router connect failed.";
       updateDeviceState(serial, { prepMessage: errorMessage });
@@ -1160,7 +1161,7 @@ async function handleRouterAction(res, user, routerId, action, body) {
     return sendJson(res, 404, { error: "Unknown router" });
   }
 
-  const result = executeRouterAction(routerId, action, body);
+  const result = await executeRouterActionAsync(routerId, action, body);
   const ok = result.ok;
   logActivity("router", `${router.label || router.id} ${action} ${ok ? "completed" : "failed"} by ${user.username}`, null);
 
@@ -1236,6 +1237,61 @@ function executeRouterAction(routerId, action, body) {
   };
 }
 
+async function executeRouterActionAsync(routerId, action, body) {
+  const router = getRouterConfig(routerId);
+  if (!router) {
+    return { ok: false, error: "Unknown router", payload: null };
+  }
+
+  const scriptName = action === "cycle-uplink" ? "cycle-mobile-uplink.ps1" : "invoke-routerfarm-router-action.ps1";
+  const args = action === "cycle-uplink"
+    ? ["-RouterId", routerId, "-PowerCycleSeconds", String(Number(body?.powerCycleSeconds) || settings.uplinkControl?.defaultPowerCycleSeconds || 12)]
+    : ["-RouterId", routerId, "-Action", action, "-RoutersPath", ROUTERS_CONFIG_PATH, "-SettingsPath", SETTINGS_PATH];
+
+  const script = await runProcess("powershell.exe", [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    path.join(SCRIPTS_DIR, scriptName),
+    ...args
+  ], {
+    cwd: ROOT,
+    windowsHide: true,
+    timeoutMs: 60000
+  });
+
+  const payload = parseJsonPayload(script.stdout);
+  const ok = script.status === 0 && payload?.ok;
+  const nextState = {
+    ...(state.routers?.[routerId] || {}),
+    lastAction: action,
+    lastResult: ok ? "ok" : "failed",
+    lastCheckedAt: new Date().toISOString(),
+    lastRestartAt: action === "reboot-router" && ok ? new Date().toISOString() : (state.routers?.[routerId]?.lastRestartAt || ""),
+    healthStatus: action === "router-health" ? (ok ? "online" : "degraded") : ((state.routers?.[routerId]?.healthStatus) || "unknown"),
+    detail: payload?.detail || payload?.message || String(script.stderr || "").trim(),
+    routerMode: payload?.telemetry?.mode || state.routers?.[routerId]?.routerMode || "",
+    uplinkMode: payload?.telemetry?.uplinkMode || state.routers?.[routerId]?.uplinkMode || "",
+    uplinkInterface: payload?.telemetry?.uplinkInterface || state.routers?.[routerId]?.uplinkInterface || "",
+    wanUp: payload?.telemetry?.wanUp === undefined ? Boolean(state.routers?.[routerId]?.wanUp) : Boolean(payload?.telemetry?.wanUp),
+    wanAddress: payload?.telemetry?.wanAddress || state.routers?.[routerId]?.wanAddress || "",
+    wanDevice: payload?.telemetry?.wanDevice || state.routers?.[routerId]?.wanDevice || "",
+    publicIp: payload?.telemetry?.publicIp || state.routers?.[routerId]?.publicIp || "",
+    telemetryCheckedAt: action === "router-health" ? new Date().toISOString() : (state.routers?.[routerId]?.telemetryCheckedAt || "")
+  };
+  state.routers[routerId] = nextState;
+  saveState();
+  refreshRouters();
+
+  return {
+    ok,
+    payload,
+    router,
+    error: payload?.message || String(script.stderr || script.stdout || "").trim() || "Router action failed"
+  };
+}
+
 function connectPhoneToRouter(serial, router) {
   const script = spawnSync("powershell.exe", [
     "-NoProfile",
@@ -1269,12 +1325,70 @@ function connectPhoneToRouter(serial, router) {
   };
 }
 
+async function connectPhoneToRouterAsync(serial, router) {
+  const script = await runProcess("powershell.exe", [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    path.join(SCRIPTS_DIR, "connect-phone-to-router.ps1"),
+    "-Serial",
+    serial,
+    "-Ssid",
+    String(router?.ssid || ""),
+    "-Password",
+    String(router?.wifiPassword || ""),
+    "-SettingsPath",
+    SETTINGS_PATH
+  ], {
+    cwd: ROOT,
+    windowsHide: true,
+    timeoutMs: 45000
+  });
+
+  const payload = parseJsonPayload(script.stdout);
+  const manualAssist = Boolean(payload?.requiresManualAssist);
+  const ok = manualAssist || (script.status === 0 && payload?.ok);
+  return {
+    ok,
+    manualAssist,
+    payload,
+    error: payload?.message || String(script.stderr || script.stdout || "").trim() || "Phone-to-router connect failed."
+  };
+}
+
 function setDeviceWifiState(serial, enabled) {
   const script = runPowerShellScript(
     "set-device-wifi-state.ps1",
     ["-Serial", serial, "-State", enabled ? "enable" : "disable", "-SettingsPath", SETTINGS_PATH],
     { detached: false, timeout: 20000 }
   );
+  const payload = parseJsonPayload(script.stdout);
+  return {
+    ok: script.status === 0 && payload?.ok !== false,
+    payload,
+    error: payload?.message || String(script.stderr || script.stdout || "").trim() || `Failed to ${enabled ? "enable" : "disable"} Wi-Fi.`
+  };
+}
+
+async function setDeviceWifiStateAsync(serial, enabled) {
+  const script = await runProcess("powershell.exe", [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    path.join(SCRIPTS_DIR, "set-device-wifi-state.ps1"),
+    "-Serial",
+    serial,
+    "-State",
+    enabled ? "enable" : "disable",
+    "-SettingsPath",
+    SETTINGS_PATH
+  ], {
+    cwd: ROOT,
+    windowsHide: true,
+    timeoutMs: 20000
+  });
   const payload = parseJsonPayload(script.stdout);
   return {
     ok: script.status === 0 && payload?.ok !== false,
@@ -1297,7 +1411,7 @@ async function enforceRouterRestartBeforeSession(serial, user, device) {
   updateDeviceState(serial, {
     prepMessage: `Checking ${router.label || router.id} before session start`
   });
-  const healthResult = executeRouterAction(router.id, "router-health", {});
+  const healthResult = await executeRouterActionAsync(router.id, "router-health", {});
   if (!healthResult.ok) {
     updateDeviceState(serial, {
       prepMessage: healthResult.error || `Router health check failed for ${router.label || router.id}`
@@ -1315,7 +1429,7 @@ async function enforceRouterRestartBeforeSession(serial, user, device) {
   updateDeviceState(serial, {
     prepMessage: `Restarting ${router.label || router.id} before session start`
   });
-  const restartResult = executeRouterAction(router.id, "reboot-router", {});
+  const restartResult = await executeRouterActionAsync(router.id, "reboot-router", {});
   if (!restartResult.ok) {
     updateDeviceState(serial, {
       prepMessage: restartResult.error || `Router restart failed for ${router.label || router.id}`
@@ -1333,7 +1447,7 @@ async function enforceRouterRestartBeforeSession(serial, user, device) {
   updateDeviceState(serial, {
     prepMessage: `Reconnecting phone to ${router.label || router.id} after router restart`
   });
-  const connectResult = connectPhoneToRouter(serial, router);
+  const connectResult = await connectPhoneToRouterAsync(serial, router);
   if (!connectResult.ok) {
     updateDeviceState(serial, {
       prepMessage: connectResult.error || `Phone-to-router reconnect failed for ${router.label || router.id}`
@@ -1449,9 +1563,15 @@ function updateDeviceState(serial, patch) {
   refreshDevices();
 }
 
-function refreshDevices() {
+async function refreshDevices() {
+  if (deviceRefreshInFlight) {
+    return;
+  }
+
+  deviceRefreshInFlight = true;
+  try {
   const previous = deviceCache;
-  const rows = queryAdbDevices();
+  const rows = await queryAdbDevicesAsync();
   const next = {};
   const networkRefreshSet = selectProbeRefreshSerials(
     rows,
@@ -1468,7 +1588,7 @@ function refreshDevices() {
     Number(settings.deviceRefresh?.accountChecksPerPass) || 2
   );
 
-  for (const row of rows) {
+  const resolvedRows = await Promise.all(rows.map(async row => {
     const stored = state.devices[row.serial] || {};
     const metadata = ensurePermanentDeviceAssignment(row.serial);
     const fallbackNetwork = {
@@ -1487,7 +1607,7 @@ function refreshDevices() {
     const needsNetworkRefresh = row.state === "device" && networkRefreshSet.has(row.serial);
     const needsAccountRefresh = row.state === "device" && accountRefreshSet.has(row.serial);
     const bundle = (needsNetworkRefresh || needsAccountRefresh)
-      ? queryDeviceProbeBundle(row.serial, true, {
+      ? await queryDeviceProbeBundleAsync(row.serial, true, {
           includeNetwork: needsNetworkRefresh,
           includeAccount: needsAccountRefresh
         })
@@ -1502,35 +1622,45 @@ function refreshDevices() {
       : (needsAccountRefresh
           ? selectBestAccountProbe(bundle?.account || fallbackAccount, previousAccount)
           : previousAccount);
-    next[row.serial] = {
-      serial: row.serial,
-      adbState: row.state,
-      online: row.state === "device",
-      model: row.model || "",
-      product: row.product || "",
-      deviceName: row.deviceName || "",
-      transportId: row.transportId || "",
-      nickname: metadata.nickname || "",
-      phoneNumber: metadata.phoneNumber || null,
-      role: metadata.role || "sim-direct",
-      parentHotspotSerial: metadata.parentHotspotSerial || "",
-      routerId: metadata.routerId || "",
-      routerSlot: parsePositiveIntegerOrNull(metadata.routerSlot),
-      network,
-      account,
-      publicIp: stored.publicIp || previous[row.serial]?.publicIp || buildMissingDevice(row.serial).publicIp,
-      prepState: stored.prepState || "idle",
-      prepEnqueuedAt: stored.prepEnqueuedAt || "",
-      prepStartedAt: stored.prepStartedAt || "",
-      prepFinishedAt: stored.prepFinishedAt || "",
-      lastPrepDurationMs: stored.lastPrepDurationMs || 0,
-      prepMessage: stored.prepMessage || "",
-      sessionState: stored.sessionState || "stopped",
-      sessionStartedAt: stored.sessionStartedAt || "",
-      sessionStoppedAt: stored.sessionStoppedAt || "",
-      viewerLaunch: stored.viewerLaunch || buildMissingDevice(row.serial).viewerLaunch,
-      lastSeenAt: new Date().toISOString()
+    return {
+      metadata,
+      device: {
+        serial: row.serial,
+        adbState: row.state,
+        online: row.state === "device",
+        model: row.model || "",
+        product: row.product || "",
+        deviceName: row.deviceName || "",
+        transportId: row.transportId || "",
+        nickname: metadata.nickname || "",
+        phoneNumber: metadata.phoneNumber || null,
+        role: metadata.role || "sim-direct",
+        parentHotspotSerial: metadata.parentHotspotSerial || "",
+        routerId: metadata.routerId || "",
+        routerSlot: parsePositiveIntegerOrNull(metadata.routerSlot),
+        network,
+        account,
+        publicIp: stored.publicIp || previous[row.serial]?.publicIp || buildMissingDevice(row.serial).publicIp,
+        prepState: stored.prepState || "idle",
+        prepEnqueuedAt: stored.prepEnqueuedAt || "",
+        prepStartedAt: stored.prepStartedAt || "",
+        prepFinishedAt: stored.prepFinishedAt || "",
+        lastPrepDurationMs: stored.lastPrepDurationMs || 0,
+        prepMessage: stored.prepMessage || "",
+        sessionState: stored.sessionState || "stopped",
+        sessionStartedAt: stored.sessionStartedAt || "",
+        sessionStoppedAt: stored.sessionStoppedAt || "",
+        viewerLaunch: stored.viewerLaunch || buildMissingDevice(row.serial).viewerLaunch,
+        lastSeenAt: new Date().toISOString()
+      }
     };
+  }));
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    const nextRow = resolvedRows[index];
+    const metadata = nextRow?.metadata || getDeviceConfig(row.serial);
+    next[row.serial] = nextRow?.device || buildMissingDevice(row.serial);
 
     const previousState = previous[row.serial]?.adbState;
     if (previousState && previousState !== row.state) {
@@ -1562,6 +1692,11 @@ function refreshDevices() {
 
   deviceCache = next;
   refreshRouters();
+  } catch (error) {
+    logActivity("warning", `Device refresh failed: ${error.message}`);
+  } finally {
+    deviceRefreshInFlight = false;
+  }
 }
 
 function selectBestAccountProbe(nextAccount, previousAccount) {
@@ -1788,6 +1923,30 @@ function queryAdbDevices() {
     .filter(Boolean);
 }
 
+async function queryAdbDevicesAsync() {
+  const adbPath = settings.adbPath || "adb";
+  const result = await runProcess(adbPath, ["devices", "-l"], {
+    cwd: ROOT,
+    windowsHide: true,
+    timeoutMs: 8000
+  });
+  if (result.error) {
+    logMissingToolOnce("adb", result.error.message);
+    return [];
+  }
+  const output = String(result.stdout || "").trim();
+  if (!output) {
+    return [];
+  }
+  return output
+    .split(/\r?\n/)
+    .slice(1)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(parseAdbLine)
+    .filter(Boolean);
+}
+
 function getCachedProbeValue(previous, serial, key, fallback) {
   return state.devices?.[serial]?.[key] || previous[serial]?.[key] || fallback;
 }
@@ -1907,6 +2066,130 @@ function queryDeviceProbeBundle(serial, online, { includeNetwork = true, include
     encoding: "utf8",
     windowsHide: true,
     timeout: 12000
+  });
+
+  if (result.error || result.status !== 0) {
+    return {
+      network: includeNetwork ? {
+        ipAddress: "",
+        interface: "",
+        source: "",
+        status: "unresolved",
+        checkedAt
+      } : offlineNetwork,
+      account: includeAccount ? {
+        gmail: "",
+        status: "unavailable",
+        checkedAt
+      } : offlineAccount
+    };
+  }
+
+  const output = String(result.stdout || "");
+  const markerPattern = /^__(PF_[A-Z0-9_]+)__$/;
+  const grouped = {};
+  let currentMarker = "";
+  for (const line of output.split(/\r?\n/)) {
+    const markerMatch = line.trim().match(markerPattern);
+    if (markerMatch) {
+      currentMarker = markerMatch[1];
+      if (!grouped[currentMarker]) {
+        grouped[currentMarker] = [];
+      }
+      continue;
+    }
+    if (!currentMarker) {
+      continue;
+    }
+    grouped[currentMarker].push(line);
+  }
+
+  let network = offlineNetwork;
+  if (includeNetwork) {
+    const attempts = [
+      ["ip-route", grouped.PF_IP_ROUTE || []],
+      ["ip-addr", grouped.PF_IP_ADDR || []],
+      ["getprop-wlan0", grouped.PF_PROP_WLAN0 || []],
+      ["getprop-rmnet", grouped.PF_PROP_RMNET || []]
+    ];
+
+    network = {
+      ipAddress: "",
+      interface: "",
+      source: "",
+      status: "unresolved",
+      checkedAt
+    };
+
+    for (const [source, lines] of attempts) {
+      const parsed = parseNetworkOutput(lines.join("\n"), source);
+      if (parsed.ipAddress) {
+        network = {
+          ipAddress: parsed.ipAddress,
+          interface: parsed.interface,
+          source,
+          status: "ok",
+          checkedAt
+        };
+        break;
+      }
+    }
+  }
+
+  let account = offlineAccount;
+  if (includeAccount) {
+    const parsedAccount = parseGoogleAccountOutput((grouped.PF_ACCOUNT || []).join("\n"));
+    account = {
+      gmail: parsedAccount.gmail,
+      status: parsedAccount.status,
+      checkedAt
+    };
+  }
+
+  return { network, account };
+}
+
+async function queryDeviceProbeBundleAsync(serial, online, { includeNetwork = true, includeAccount = true } = {}) {
+  const checkedAt = new Date().toISOString();
+  const offlineNetwork = {
+    ipAddress: "",
+    interface: "",
+    source: "",
+    status: "offline",
+    checkedAt
+  };
+  const offlineAccount = {
+    gmail: "",
+    status: "offline",
+    checkedAt
+  };
+
+  if (!online) {
+    return {
+      network: offlineNetwork,
+      account: offlineAccount
+    };
+  }
+
+  const segments = [];
+  if (includeNetwork) {
+    segments.push(["PF_IP_ROUTE", "ip route 2>/dev/null"]);
+    segments.push(["PF_IP_ADDR", "ip -f inet addr show 2>/dev/null"]);
+    segments.push(["PF_PROP_WLAN0", "getprop dhcp.wlan0.ipaddress 2>/dev/null"]);
+    segments.push(["PF_PROP_RMNET", "getprop dhcp.rmnet_data0.ipaddress 2>/dev/null"]);
+  }
+  if (includeAccount) {
+    segments.push(["PF_ACCOUNT", "dumpsys account 2>/dev/null"]);
+  }
+
+  const shellScript = segments
+    .map(([marker, command]) => `echo __${marker}__; ${command}`)
+    .join("; ");
+
+  const result = await runProcess(settings.adbPath || "adb", ["-s", serial, "shell", "sh", "-c", shellScript], {
+    cwd: ROOT,
+    windowsHide: true,
+    timeoutMs: 12000
   });
 
   if (result.error || result.status !== 0) {
@@ -2774,4 +3057,73 @@ function runPowerShellScript(scriptName, scriptArgs = [], options) {
   }
 
   return child;
+}
+
+function runProcess(command, args = [], options = {}) {
+  return new Promise(resolve => {
+    const child = spawn(command, args, {
+      cwd: options.cwd || ROOT,
+      windowsHide: options.windowsHide ?? true,
+      detached: false,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    let timedOut = false;
+    let timeoutHandle = null;
+
+    const finalize = payload => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+      resolve(payload);
+    };
+
+    if (child.stdout) {
+      child.stdout.on("data", chunk => {
+        stdout += chunk.toString();
+      });
+    }
+
+    if (child.stderr) {
+      child.stderr.on("data", chunk => {
+        stderr += chunk.toString();
+      });
+    }
+
+    if (options.timeoutMs) {
+      timeoutHandle = setTimeout(() => {
+        timedOut = true;
+        try {
+          child.kill();
+        } catch (error) {
+          // Ignore kill failures on timed out child processes.
+        }
+      }, Math.max(Number(options.timeoutMs) || 0, 1));
+    }
+
+    child.on("error", error => {
+      finalize({
+        stdout,
+        stderr,
+        status: null,
+        error
+      });
+    });
+
+    child.on("exit", code => {
+      finalize({
+        stdout,
+        stderr,
+        status: code,
+        error: timedOut ? new Error(`Process timed out after ${options.timeoutMs}ms`) : null
+      });
+    });
+  });
 }

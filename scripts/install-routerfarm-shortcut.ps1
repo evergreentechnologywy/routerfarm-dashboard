@@ -1,9 +1,20 @@
 param(
-  [string]$ExePath = "C:\RouterFarm\dist\win-arm64-unpacked\RouterFarm.exe",
+  [string]$ExePath,
   [string]$ShortcutName = "RouterFarm"
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $ExePath) {
+  $projectRoot = Split-Path -Parent $PSScriptRoot
+  $candidatePaths = @(
+    (Join-Path $projectRoot "dist\win-unpacked\RouterFarm.exe"),
+    (Join-Path $projectRoot "dist\win-arm64-unpacked\RouterFarm.exe"),
+    "C:\RouterFarm\dist\win-unpacked\RouterFarm.exe",
+    "C:\RouterFarm\dist\win-arm64-unpacked\RouterFarm.exe"
+  )
+  $ExePath = $candidatePaths | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+}
 
 if (-not (Test-Path -LiteralPath $ExePath)) {
   throw "RouterFarm executable was not found at $ExePath"
