@@ -998,6 +998,9 @@ function buildCompactWarning(device) {
   if (isReused(device)) {
     return device.publicIp?.reusePolicyLabel || "This IP was reused recently and should be rotated.";
   }
+  if (state.data?.settings?.sessionPolicy?.restartRouterBeforeSession) {
+    return "RouterFarm will restart the assigned router before session start and require a fresh IP.";
+  }
   if (isDuplicate(device)) {
     return "Duplicate IP detected in the current set.";
   }

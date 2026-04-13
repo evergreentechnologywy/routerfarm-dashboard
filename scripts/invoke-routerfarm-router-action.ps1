@@ -64,7 +64,7 @@ if ([string]::IsNullOrWhiteSpace($routerHost)) {
 
 $commandMap = @{
   "router-health" = "ubus call system board"
-  "reboot-router" = "reboot"
+  "reboot-router" = "sh -c '(sleep 1; reboot) >/dev/null 2>&1 &'"
   "restart-wifi" = "wifi reload"
   "wan-reconnect" = "ifup wan || /etc/init.d/network restart"
   "usb-tether-reset" = "ifdown wan; sleep 2; ifup wan"

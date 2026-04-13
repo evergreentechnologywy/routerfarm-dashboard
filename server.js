@@ -65,6 +65,12 @@ const DEFAULT_SETTINGS = {
     powerCycleScriptPath: path.join(SCRIPTS_DIR, "cycle-mobile-uplink.ps1"),
     defaultPowerCycleSeconds: 12
   },
+  sessionPolicy: {
+    restartRouterBeforeSession: true,
+    routerRestartSettleMs: 45000,
+    reconnectPhoneAfterRouterRestart: true,
+    reconnectWaitMs: 8000
+  },
   ipReusePolicy: {
     historyLimit: 100,
     maxAgeHours: 72,
@@ -662,6 +668,7 @@ function buildStatus(user) {
       routerRefreshIntervalMs: settings.routerRefreshIntervalMs,
       prep: settings.prep,
       topology: settings.topology || DEFAULT_SETTINGS.topology,
+      sessionPolicy: settings.sessionPolicy || DEFAULT_SETTINGS.sessionPolicy,
       ipReusePolicy: ipPolicy
     },
     queue: visibleQueue,
@@ -869,6 +876,10 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     if (!activationLock.allowed) {
       return sendJson(res, 409, { error: activationLock.reason, activationLock });
     }
+    const restartGate = await enforceRouterRestartBeforeSession(serial, user, knownDevice);
+    if (!restartGate.ok) {
+      return sendJson(res, 409, { error: restartGate.error || "Router restart gate failed", detail: restartGate.detail || null });
+    }
     const verification = await runDevicePublicIpCheck(serial, "pre-session");
     if (!verification.success) {
       return sendJson(res, 409, { error: verification.error || "IP verification failed; session not started" });
@@ -909,51 +920,29 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
   if (action === "connect-router") {
     const router = knownDevice.routerId ? getRouterConfig(knownDevice.routerId) : null;
     if (!router) {
-      return sendJson(res, 409, { error: "Assign this phone to an Opal router before connecting." });
+      return sendJson(res, 409, { error: "Assign this phone to a router before connecting." });
     }
-    const script = spawnSync("powershell.exe", [
-      "-NoProfile",
-      "-ExecutionPolicy",
-      "Bypass",
-      "-File",
-      path.join(SCRIPTS_DIR, "connect-phone-to-router.ps1"),
-      "-Serial",
-      serial,
-      "-Ssid",
-      String(router.ssid || ""),
-      "-Password",
-      String(router.wifiPassword || ""),
-      "-SettingsPath",
-      SETTINGS_PATH
-    ], {
-      cwd: ROOT,
-      encoding: "utf8",
-      windowsHide: true,
-      timeout: 45000
-    });
-
-    const payload = parseJsonPayload(script.stdout);
-    const manualAssist = Boolean(payload?.requiresManualAssist);
-    if ((script.status !== 0 || !payload?.ok) && !manualAssist) {
-      const errorMessage = payload?.message || String(script.stderr || script.stdout || "").trim() || "Phone-to-router connect failed.";
+    const connectResult = connectPhoneToRouter(serial, router);
+    if (!connectResult.ok) {
+      const errorMessage = connectResult.error || "Phone-to-router connect failed.";
       updateDeviceState(serial, { prepMessage: errorMessage });
       logActivity("router-connect", `Phone-to-router connect failed: ${errorMessage}`, serial);
-      return sendJson(res, 500, { error: errorMessage, detail: payload || null });
+      return sendJson(res, 500, { error: errorMessage, detail: connectResult.payload || null });
     }
 
     updateDeviceState(serial, {
-      prepMessage: payload?.message || `Router Wi-Fi connect requested for ${router.label || router.id}`
+      prepMessage: connectResult.payload?.message || `Router Wi-Fi connect requested for ${router.label || router.id}`
     });
-    logActivity("router-connect", manualAssist
+    logActivity("router-connect", connectResult.manualAssist
       ? `Phone-to-router connect requires manual completion for ${router.label || router.id}`
       : `Phone-to-router connect requested by ${user.username} for ${router.label || router.id}`, serial);
-    return sendJson(res, 200, { ok: true, manualAssist, detail: payload });
+    return sendJson(res, 200, { ok: true, manualAssist: connectResult.manualAssist, detail: connectResult.payload });
   }
 
   if (action === "reset-uplink-ip") {
     const router = knownDevice.routerId ? getRouterConfig(knownDevice.routerId) : null;
     if (!router) {
-      return sendJson(res, 409, { error: "Assign this phone to an Opal router before resetting its uplink." });
+      return sendJson(res, 409, { error: "Assign this phone to a router before resetting its uplink." });
     }
     return handleRouterAction(res, user, router.id, "cycle-uplink", body);
   }
@@ -999,6 +988,32 @@ async function handleRouterAction(res, user, routerId, action, body) {
     return sendJson(res, 404, { error: "Unknown router" });
   }
 
+  const result = executeRouterAction(routerId, action, body);
+  const ok = result.ok;
+  logActivity("router", `${router.label || router.id} ${action} ${ok ? "completed" : "failed"} by ${user.username}`, null);
+
+  if (action === "router-health") {
+    return sendJson(res, 200, {
+      ok,
+      detail: result.payload || null,
+      router: routerCache[routerId] || null,
+      error: ok ? "" : (result.error || "Router health probe failed")
+    });
+  }
+
+  if (!ok) {
+    return sendJson(res, 500, { error: result.error || "Router action failed", detail: result.payload || null, router: routerCache[routerId] || null });
+  }
+
+  return sendJson(res, 200, { ok: true, detail: result.payload || null, router: routerCache[routerId] || null });
+}
+
+function executeRouterAction(routerId, action, body) {
+  const router = getRouterConfig(routerId);
+  if (!router) {
+    return { ok: false, error: "Unknown router", payload: null };
+  }
+
   const scriptName = action === "cycle-uplink" ? "cycle-mobile-uplink.ps1" : "invoke-routerfarm-router-action.ps1";
   const args = action === "cycle-uplink"
     ? ["-RouterId", routerId, "-PowerCycleSeconds", String(Number(body?.powerCycleSeconds) || settings.uplinkControl?.defaultPowerCycleSeconds || 12)]
@@ -1025,28 +1040,104 @@ async function handleRouterAction(res, user, routerId, action, body) {
     lastAction: action,
     lastResult: ok ? "ok" : "failed",
     lastCheckedAt: new Date().toISOString(),
+    lastRestartAt: action === "reboot-router" && ok ? new Date().toISOString() : (state.routers?.[routerId]?.lastRestartAt || ""),
     healthStatus: action === "router-health" ? (ok ? "online" : "degraded") : ((state.routers?.[routerId]?.healthStatus) || "unknown"),
     detail: payload?.detail || payload?.message || String(script.stderr || "").trim()
   };
   state.routers[routerId] = nextState;
   saveState();
   refreshRouters();
-  logActivity("router", `${router.label || router.id} ${action} ${ok ? "completed" : "failed"} by ${user.username}`, null);
 
-  if (action === "router-health") {
-    return sendJson(res, 200, {
-      ok,
-      detail: payload || null,
-      router: routerCache[routerId] || null,
-      error: ok ? "" : (payload?.message || "Router health probe failed")
+  return {
+    ok,
+    payload,
+    router,
+    error: payload?.message || String(script.stderr || script.stdout || "").trim() || "Router action failed"
+  };
+}
+
+function connectPhoneToRouter(serial, router) {
+  const script = spawnSync("powershell.exe", [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    path.join(SCRIPTS_DIR, "connect-phone-to-router.ps1"),
+    "-Serial",
+    serial,
+    "-Ssid",
+    String(router?.ssid || ""),
+    "-Password",
+    String(router?.wifiPassword || ""),
+    "-SettingsPath",
+    SETTINGS_PATH
+  ], {
+    cwd: ROOT,
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 45000
+  });
+
+  const payload = parseJsonPayload(script.stdout);
+  const manualAssist = Boolean(payload?.requiresManualAssist);
+  const ok = manualAssist || (script.status === 0 && payload?.ok);
+  return {
+    ok,
+    manualAssist,
+    payload,
+    error: payload?.message || String(script.stderr || script.stdout || "").trim() || "Phone-to-router connect failed."
+  };
+}
+
+async function enforceRouterRestartBeforeSession(serial, user, device) {
+  const policy = settings.sessionPolicy || DEFAULT_SETTINGS.sessionPolicy;
+  if (!policy.restartRouterBeforeSession) {
+    return { ok: true, skipped: true };
+  }
+
+  const router = device.routerId ? getRouterConfig(device.routerId) : null;
+  if (!router) {
+    return { ok: false, error: "Assign this phone to a router before starting a session." };
+  }
+
+  updateDeviceState(serial, {
+    prepMessage: `Restarting ${router.label || router.id} before session start`
+  });
+  const restartResult = executeRouterAction(router.id, "reboot-router", {});
+  if (!restartResult.ok) {
+    updateDeviceState(serial, {
+      prepMessage: restartResult.error || `Router restart failed for ${router.label || router.id}`
     });
+    return { ok: false, error: restartResult.error || "Router restart failed", detail: restartResult.payload || null };
   }
 
-  if (!ok) {
-    return sendJson(res, 500, { error: payload?.message || "Router action failed", detail: payload || null, router: routerCache[routerId] || null });
+  logActivity("router", `${router.label || router.id} restarted automatically before session start by ${user.username}`, serial);
+  await delay(Number(policy.routerRestartSettleMs) || 45000);
+
+  if (!policy.reconnectPhoneAfterRouterRestart) {
+    return { ok: true, routerRestarted: true, reconnectSkipped: true };
   }
 
-  return sendJson(res, 200, { ok: true, detail: payload || null, router: routerCache[routerId] || null });
+  updateDeviceState(serial, {
+    prepMessage: `Reconnecting phone to ${router.label || router.id} after router restart`
+  });
+  const connectResult = connectPhoneToRouter(serial, router);
+  if (!connectResult.ok) {
+    updateDeviceState(serial, {
+      prepMessage: connectResult.error || `Phone-to-router reconnect failed for ${router.label || router.id}`
+    });
+    return { ok: false, error: connectResult.error || "Phone-to-router reconnect failed", detail: connectResult.payload || null };
+  }
+
+  logActivity("router-connect", connectResult.manualAssist
+    ? `Phone-to-router reconnect needs manual completion after router restart for ${router.label || router.id}`
+    : `Phone reconnected to ${router.label || router.id} after automatic router restart`, serial);
+
+  await delay(Number(policy.reconnectWaitMs) || 8000);
+  updateDeviceState(serial, {
+    prepMessage: `Router restart completed for ${router.label || router.id}; verifying fresh IP`
+  });
+  return { ok: true, routerRestarted: true, reconnectResult };
 }
 
 function parseJsonPayload(raw) {
@@ -1063,6 +1154,10 @@ function parseJsonPayload(raw) {
     }
   }
   return null;
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, Math.max(Number(ms) || 0, 0)));
 }
 
 function buildMissingDevice(serial) {

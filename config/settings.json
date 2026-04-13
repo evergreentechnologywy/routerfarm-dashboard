@@ -27,6 +27,12 @@
     "powerCycleScriptPath": "C:\\Users\\everg\\routerfarm-release\\scripts\\cycle-mobile-uplink.ps1",
     "defaultPowerCycleSeconds": 12
   },
+  "sessionPolicy": {
+    "restartRouterBeforeSession": true,
+    "routerRestartSettleMs": 45000,
+    "reconnectPhoneAfterRouterRestart": true,
+    "reconnectWaitMs": 8000
+  },
   "ipReusePolicy": {
     "historyLimit": 100,
     "maxAgeHours": 72,
