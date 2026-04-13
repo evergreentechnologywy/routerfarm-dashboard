@@ -36,7 +36,8 @@ foreach ($device in $devices) {
     $device | Add-Member -NotePropertyName routerSlot -NotePropertyValue $null
   }
   $device.role = "router-client"
-  if ($PreserveExistingAssignments -and $device.routerId) {
+  $routerIsEnabled = $device.routerId -and $slotMap.ContainsKey([string]$device.routerId)
+  if ($PreserveExistingAssignments -and $routerIsEnabled) {
     if ($slotMap.ContainsKey($device.routerId)) {
       $slotMap[$device.routerId].Add($device) | Out-Null
     }

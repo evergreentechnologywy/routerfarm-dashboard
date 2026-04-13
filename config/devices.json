@@ -1,220 +1,184 @@
 {
   "devices": [
     {
-      "serial": "6F9B97EE",
-      "nickname": "Phone 01",
-      "role": "router-client",
-      "parentHotspotSerial": "",
+      "serial": "23A2C618",
       "phoneNumber": 1,
-      "routerId": "opal-01",
-      "routerSlot": 1
-    },
-    {
-      "serial": "23B3C605",
-      "nickname": "Phone 02",
-      "role": "router-client",
+      "nickname": "Phone 01",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "phoneNumber": 2,
-      "routerId": "opal-02",
-      "routerSlot": 1
-    },
-    {
-      "serial": "23B6C60B",
-      "nickname": "Phone 03",
-      "role": "router-client",
-      "parentHotspotSerial": "",
-      "phoneNumber": 3,
-      "routerId": "opal-03",
-      "routerSlot": 1
-    },
-    {
-      "serial": "23BFC680",
-      "nickname": "Phone 04",
-      "role": "router-client",
-      "parentHotspotSerial": "",
-      "phoneNumber": 4,
-      "routerId": "opal-04",
-      "routerSlot": 1
-    },
-    {
-      "serial": "23BFC6BD",
-      "nickname": "Phone 05",
-      "role": "router-client",
-      "parentHotspotSerial": "",
-      "phoneNumber": 5,
-      "routerId": "opal-05",
-      "routerSlot": 1
-    },
-    {
-      "serial": "23C7C69C",
-      "nickname": "Phone 06",
-      "role": "router-client",
-      "parentHotspotSerial": "",
-      "phoneNumber": 6,
-      "routerId": "opal-06",
-      "routerSlot": 1
-    },
-    {
-      "serial": "7001963A",
-      "nickname": "Phone 07",
-      "role": "router-client",
-      "parentHotspotSerial": "",
-      "phoneNumber": 7,
-      "routerId": "opal-07",
-      "routerSlot": 1
+      "routerId": "",
+      "routerSlot": null
     },
     {
       "serial": "23AAC64B",
-      "phoneNumber": 8,
-      "nickname": "Phone 08",
-      "role": "router-client",
+      "phoneNumber": 2,
+      "nickname": "Phone 02",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-08",
-      "routerSlot": 1
+      "routerId": "",
+      "routerSlot": null
     },
     {
       "serial": "23AAC652",
-      "phoneNumber": 9,
-      "nickname": "Phone 09",
-      "role": "router-client",
+      "phoneNumber": 3,
+      "nickname": "Phone 03",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-09",
-      "routerSlot": 1
+      "routerId": "",
+      "routerSlot": null
+    },
+    {
+      "serial": "23B3C605",
+      "phoneNumber": 4,
+      "nickname": "Phone 04",
+      "role": "sim-direct",
+      "parentHotspotSerial": "",
+      "routerId": "",
+      "routerSlot": null
+    },
+    {
+      "serial": "23B6C60B",
+      "phoneNumber": 5,
+      "nickname": "Phone 05",
+      "role": "sim-direct",
+      "parentHotspotSerial": "",
+      "routerId": "",
+      "routerSlot": null
     },
     {
       "serial": "23BFC639",
+      "phoneNumber": 6,
+      "nickname": "Phone 06",
+      "role": "sim-direct",
+      "parentHotspotSerial": "",
+      "routerId": "",
+      "routerSlot": null
+    },
+    {
+      "serial": "23BFC671",
+      "phoneNumber": 7,
+      "nickname": "Phone 07",
+      "role": "sim-direct",
+      "parentHotspotSerial": "",
+      "routerId": "",
+      "routerSlot": null
+    },
+    {
+      "serial": "23BFC680",
+      "phoneNumber": 8,
+      "nickname": "Phone 08",
+      "role": "sim-direct",
+      "parentHotspotSerial": "",
+      "routerId": "",
+      "routerSlot": null
+    },
+    {
+      "serial": "23BFC6BD",
+      "phoneNumber": 9,
+      "nickname": "Phone 09",
+      "role": "sim-direct",
+      "parentHotspotSerial": "",
+      "routerId": "",
+      "routerSlot": null
+    },
+    {
+      "serial": "23C7C69C",
       "phoneNumber": 10,
       "nickname": "Phone 10",
-      "role": "router-client",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-10",
-      "routerSlot": 1
+      "routerId": "",
+      "routerSlot": null
     },
     {
       "serial": "23DFC6CA",
       "phoneNumber": 11,
       "nickname": "Phone 11",
-      "role": "router-client",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-11",
-      "routerSlot": 1
+      "routerId": "",
+      "routerSlot": null
     },
     {
-      "serial": "A69CAA34",
+      "serial": "6F6296C5",
       "phoneNumber": 12,
       "nickname": "Phone 12",
-      "role": "router-client",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-12",
-      "routerSlot": 1
+      "routerId": "",
+      "routerSlot": null
     },
     {
-      "serial": "A6A5AAB9",
+      "serial": "6F9B97EE",
       "phoneNumber": 13,
       "nickname": "Phone 13",
-      "role": "router-client",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-13",
-      "routerSlot": 1
+      "routerId": "",
+      "routerSlot": null
     },
     {
-      "serial": "AC7BAAD5",
+      "serial": "6FA09768",
       "phoneNumber": 14,
       "nickname": "Phone 14",
-      "role": "router-client",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-14",
-      "routerSlot": 1
+      "routerId": "",
+      "routerSlot": null
     },
     {
       "serial": "700197EC",
       "phoneNumber": 15,
       "nickname": "Phone 15",
-      "role": "router-client",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-15",
-      "routerSlot": 1
+      "routerId": "",
+      "routerSlot": null
     },
     {
-      "serial": "A6D6AA6C",
+      "serial": "A69CAA34",
       "phoneNumber": 16,
       "nickname": "Phone 16",
-      "role": "router-client",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-01",
-      "routerSlot": 2
+      "routerId": "",
+      "routerSlot": null
     },
     {
       "serial": "A69CAA5F",
       "phoneNumber": 17,
       "nickname": "Phone 17",
-      "role": "router-client",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-02",
-      "routerSlot": 2
+      "routerId": "",
+      "routerSlot": null
     },
     {
-      "serial": "6F6296C5",
+      "serial": "A6A5AAB9",
       "phoneNumber": 18,
       "nickname": "Phone 18",
-      "role": "router-client",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-03",
-      "routerSlot": 2
-    },
-    {
-      "serial": "23DFC6DE",
-      "phoneNumber": 19,
-      "nickname": "Phone 19",
-      "role": "router-client",
-      "parentHotspotSerial": "",
-      "routerId": "opal-04",
-      "routerSlot": 2
-    },
-    {
-      "serial": "23BAC6D1",
-      "phoneNumber": 20,
-      "nickname": "Phone 20",
-      "role": "router-client",
-      "parentHotspotSerial": "",
-      "routerId": "opal-05",
-      "routerSlot": 2
-    },
-    {
-      "serial": "23A2C618",
-      "phoneNumber": 21,
-      "nickname": "Phone 21",
-      "role": "router-client",
-      "parentHotspotSerial": "",
-      "routerId": "opal-06",
-      "routerSlot": 2
-    },
-    {
-      "serial": "23BFC671",
-      "phoneNumber": 22,
-      "nickname": "Phone 22",
-      "role": "router-client",
-      "parentHotspotSerial": "",
-      "routerId": "opal-07",
-      "routerSlot": 2
-    },
-    {
-      "serial": "6FA09768",
-      "phoneNumber": 23,
-      "nickname": "Phone 23",
-      "role": "router-client",
-      "parentHotspotSerial": "",
-      "routerId": "opal-08",
-      "routerSlot": 2
+      "routerId": "",
+      "routerSlot": null
     },
     {
       "serial": "A6B2AA09",
-      "phoneNumber": 24,
-      "nickname": "Phone 24",
-      "role": "router-client",
+      "phoneNumber": 19,
+      "nickname": "Phone 19",
+      "role": "sim-direct",
       "parentHotspotSerial": "",
-      "routerId": "opal-09",
-      "routerSlot": 2
+      "routerId": "",
+      "routerSlot": null
+    },
+    {
+      "serial": "A6D6AA6C",
+      "phoneNumber": 20,
+      "nickname": "Phone 20",
+      "role": "sim-direct",
+      "parentHotspotSerial": "",
+      "routerId": "",
+      "routerSlot": null
     }
   ]
 }
