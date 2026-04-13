@@ -283,7 +283,7 @@ function createWindow(context) {
 
   mainWindow.webContents.on("did-finish-load", async () => {
     try {
-      const bridgeReady = await mainWindow.webContents.executeJavaScript("Boolean(window.phoneFarmDesktop && window.phoneFarmDesktop.isDesktopApp)", true);
+      const bridgeReady = await mainWindow.webContents.executeJavaScript("Boolean((window.routerFarmDesktop || window.phoneFarmDesktop) && (window.routerFarmDesktop || window.phoneFarmDesktop).isDesktopApp)", true);
       writeDesktopLog(context.root, `Renderer loaded from local files; API bridge ready=${bridgeReady}; backend=${context.baseUrl}`);
     } catch (error) {
       writeDesktopLog(context.root, `Renderer bridge check failed: ${error.message}`);
@@ -300,10 +300,11 @@ async function callRendererBridge(methodName, arg) {
 
   const serializedArg = JSON.stringify(arg);
   const script = `(async () => {
-    if (!window.phoneFarmDesktop || typeof window.phoneFarmDesktop.${methodName} !== "function") {
+    const desktopBridge = window.routerFarmDesktop || window.phoneFarmDesktop;
+    if (!desktopBridge || typeof desktopBridge.${methodName} !== "function") {
       throw new Error("Desktop bridge method ${methodName} is not available");
     }
-    return await window.phoneFarmDesktop.${methodName}(${serializedArg});
+    return await desktopBridge.${methodName}(${serializedArg});
   })()`;
 
   return mainWindow.webContents.executeJavaScript(script, true);
@@ -321,7 +322,7 @@ async function runDesktopViewerAction(testSpec, context) {
   };
 
   try {
-    result.bridgeReady = await mainWindow.webContents.executeJavaScript("Boolean(window.phoneFarmDesktop && window.phoneFarmDesktop.isDesktopApp)", true);
+    result.bridgeReady = await mainWindow.webContents.executeJavaScript("Boolean((window.routerFarmDesktop || window.phoneFarmDesktop) && (window.routerFarmDesktop || window.phoneFarmDesktop).isDesktopApp)", true);
     if (!result.bridgeReady) {
       throw new Error("Desktop bridge is not available in the renderer");
     }

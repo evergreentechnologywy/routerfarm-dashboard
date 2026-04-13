@@ -1,31 +1,31 @@
 :root {
-  --bg: #f5f7fb;
-  --bg-muted: #eef2f7;
-  --surface: rgba(255, 255, 255, 0.92);
+  --bg: #edf3ed;
+  --bg-muted: #dde7de;
+  --surface: rgba(252, 253, 249, 0.9);
   --surface-strong: rgba(255, 255, 255, 0.98);
-  --surface-muted: #f8fafc;
-  --surface-dark: #0f172a;
-  --border: rgba(15, 23, 42, 0.08);
-  --border-strong: rgba(15, 23, 42, 0.14);
-  --text: #111827;
-  --text-muted: #667085;
-  --text-soft: #94a3b8;
-  --heading: #0b1324;
-  --primary: #2563eb;
-  --primary-strong: #1d4ed8;
+  --surface-muted: #f4f7f1;
+  --surface-dark: #14231d;
+  --border: rgba(20, 35, 29, 0.08);
+  --border-strong: rgba(20, 35, 29, 0.18);
+  --text: #15201a;
+  --text-muted: #5f7067;
+  --text-soft: #849389;
+  --heading: #102019;
+  --primary: #0f7c63;
+  --primary-strong: #0a5f4c;
   --success-bg: #e8f7ef;
   --success-text: #1d7a47;
   --warning-bg: #fff4d6;
   --warning-text: #9a6700;
-  --info-bg: #e9f0ff;
-  --info-text: #2458c6;
+  --info-bg: #e6f5f1;
+  --info-text: #0d6b57;
   --danger-bg: #fdecec;
   --danger-text: #b42318;
-  --neutral-bg: #eef2f7;
-  --neutral-text: #526174;
-  --shadow-lg: 0 24px 54px rgba(15, 23, 42, 0.08);
-  --shadow-md: 0 12px 28px rgba(15, 23, 42, 0.06);
-  --shadow-sm: 0 6px 14px rgba(15, 23, 42, 0.04);
+  --neutral-bg: #ebf0ea;
+  --neutral-text: #53655b;
+  --shadow-lg: 0 24px 54px rgba(16, 32, 25, 0.1);
+  --shadow-md: 0 12px 28px rgba(16, 32, 25, 0.08);
+  --shadow-sm: 0 6px 14px rgba(16, 32, 25, 0.05);
   --radius-2xl: 32px;
   --radius-xl: 24px;
   --radius-lg: 18px;
@@ -51,11 +51,11 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   color: var(--text);
-  font-family: "Aptos", "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", sans-serif;
+  font-family: "Bahnschrift", "Aptos", "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.045), transparent 24%),
-    radial-gradient(circle at top right, rgba(15, 23, 42, 0.03), transparent 20%),
-    linear-gradient(180deg, #fafcff 0%, var(--bg) 100%);
+    radial-gradient(circle at top left, rgba(15, 124, 99, 0.12), transparent 26%),
+    radial-gradient(circle at top right, rgba(193, 109, 34, 0.11), transparent 22%),
+    linear-gradient(180deg, #f9faf6 0%, var(--bg) 100%);
 }
 
 body::-webkit-scrollbar,
@@ -108,7 +108,7 @@ select {
   height: 320px;
   top: -90px;
   left: -80px;
-  background: rgba(37, 99, 235, 0.16);
+  background: rgba(15, 124, 99, 0.2);
 }
 
 .backdrop-orb-right {
@@ -116,7 +116,7 @@ select {
   height: 360px;
   top: 120px;
   right: -120px;
-  background: rgba(15, 23, 42, 0.10);
+  background: rgba(193, 109, 34, 0.15);
 }
 
 .backdrop-grid {
@@ -181,7 +181,18 @@ h2 {
   position: absolute;
   inset: 0 0 auto;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.44), transparent);
+  background: linear-gradient(90deg, transparent, rgba(15, 124, 99, 0.52), rgba(193, 109, 34, 0.4), transparent);
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 120px;
+  background:
+    linear-gradient(135deg, rgba(15, 124, 99, 0.09), transparent 55%),
+    linear-gradient(225deg, rgba(193, 109, 34, 0.08), transparent 52%);
+  pointer-events: none;
 }
 
 .hero-topbar {
@@ -358,8 +369,8 @@ h2 {
   position: sticky;
   top: 12px;
   z-index: 24;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+  background: rgba(249, 251, 246, 0.82);
+  box-shadow: 0 14px 34px rgba(16, 32, 25, 0.08);
 }
 
 .context-bar {
@@ -614,12 +625,12 @@ h2 {
 
 .button-primary {
   color: #fff;
-  background: linear-gradient(180deg, #2a6bf2, #1456d9);
-  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
+  background: linear-gradient(180deg, #138468, #0a5f4c);
+  box-shadow: 0 14px 28px rgba(15, 124, 99, 0.22);
 }
 
 .button-secondary {
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.84);
   color: var(--heading);
   border-color: var(--border);
 }
@@ -1182,11 +1193,22 @@ h2 {
 
 .router-card {
   display: grid;
-  gap: 10px;
-  padding: 16px;
-  border-radius: 18px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.9);
+  gap: 12px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(16, 32, 25, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 244, 0.92));
+  box-shadow: 0 18px 34px rgba(16, 32, 25, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.router-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, rgba(15, 124, 99, 0.95), rgba(193, 109, 34, 0.75));
 }
 
 .router-card header {
@@ -1216,6 +1238,28 @@ h2 {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.router-meta strong.badge-ready,
+.router-meta strong.badge-failed,
+.router-meta strong.badge-neutral,
+.router-meta strong.badge-queued {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+}
+
+.router-alert {
+  padding: 12px 13px;
+  border-radius: 14px;
+  border: 1px solid rgba(180, 35, 24, 0.12);
+  background: linear-gradient(180deg, rgba(253, 236, 236, 0.98), rgba(255, 244, 240, 0.95));
+  color: var(--danger-text);
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .router-actions {

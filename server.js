@@ -561,6 +561,10 @@ function buildRouterStatuses(visibleDevices) {
         routerMode: routerState.routerMode || "",
         uplinkMode: routerState.uplinkMode || "",
         uplinkInterface: routerState.uplinkInterface || "",
+        tetheringState: routerState.tetheringState || "",
+        tetheringError: routerState.tetheringError || "",
+        tetheringHint: routerState.tetheringHint || "",
+        usbPorts: routerState.usbPorts || "",
         wanUp: Boolean(routerState.wanUp),
         wanAddress: routerState.wanAddress || "",
         wanDevice: routerState.wanDevice || "",
@@ -1212,17 +1216,22 @@ function executeRouterAction(routerId, action, body) {
 
   const payload = parseJsonPayload(script.stdout);
   const ok = script.status === 0 && payload?.ok;
+  const healthStatus = deriveRouterHealthStatus(action, ok, payload, state.routers?.[routerId] || {});
   const nextState = {
     ...(state.routers?.[routerId] || {}),
     lastAction: action,
     lastResult: ok ? "ok" : "failed",
     lastCheckedAt: new Date().toISOString(),
     lastRestartAt: action === "reboot-router" && ok ? new Date().toISOString() : (state.routers?.[routerId]?.lastRestartAt || ""),
-    healthStatus: action === "router-health" ? (ok ? "online" : "degraded") : ((state.routers?.[routerId]?.healthStatus) || "unknown"),
+    healthStatus,
     detail: payload?.detail || payload?.message || String(script.stderr || "").trim(),
     routerMode: payload?.telemetry?.mode || state.routers?.[routerId]?.routerMode || "",
     uplinkMode: payload?.telemetry?.uplinkMode || state.routers?.[routerId]?.uplinkMode || "",
     uplinkInterface: payload?.telemetry?.uplinkInterface || state.routers?.[routerId]?.uplinkInterface || "",
+    tetheringState: payload?.telemetry?.tetheringState || state.routers?.[routerId]?.tetheringState || "",
+    tetheringError: payload?.telemetry?.tetheringError || state.routers?.[routerId]?.tetheringError || "",
+    tetheringHint: payload?.telemetry?.tetheringHint || state.routers?.[routerId]?.tetheringHint || "",
+    usbPorts: payload?.telemetry?.usbPorts || state.routers?.[routerId]?.usbPorts || "",
     wanUp: payload?.telemetry?.wanUp === undefined ? Boolean(state.routers?.[routerId]?.wanUp) : Boolean(payload?.telemetry?.wanUp),
     wanAddress: payload?.telemetry?.wanAddress || state.routers?.[routerId]?.wanAddress || "",
     wanDevice: payload?.telemetry?.wanDevice || state.routers?.[routerId]?.wanDevice || "",
@@ -1267,17 +1276,22 @@ async function executeRouterActionAsync(routerId, action, body) {
 
   const payload = parseJsonPayload(script.stdout);
   const ok = script.status === 0 && payload?.ok;
+  const healthStatus = deriveRouterHealthStatus(action, ok, payload, state.routers?.[routerId] || {});
   const nextState = {
     ...(state.routers?.[routerId] || {}),
     lastAction: action,
     lastResult: ok ? "ok" : "failed",
     lastCheckedAt: new Date().toISOString(),
     lastRestartAt: action === "reboot-router" && ok ? new Date().toISOString() : (state.routers?.[routerId]?.lastRestartAt || ""),
-    healthStatus: action === "router-health" ? (ok ? "online" : "degraded") : ((state.routers?.[routerId]?.healthStatus) || "unknown"),
+    healthStatus,
     detail: payload?.detail || payload?.message || String(script.stderr || "").trim(),
     routerMode: payload?.telemetry?.mode || state.routers?.[routerId]?.routerMode || "",
     uplinkMode: payload?.telemetry?.uplinkMode || state.routers?.[routerId]?.uplinkMode || "",
     uplinkInterface: payload?.telemetry?.uplinkInterface || state.routers?.[routerId]?.uplinkInterface || "",
+    tetheringState: payload?.telemetry?.tetheringState || state.routers?.[routerId]?.tetheringState || "",
+    tetheringError: payload?.telemetry?.tetheringError || state.routers?.[routerId]?.tetheringError || "",
+    tetheringHint: payload?.telemetry?.tetheringHint || state.routers?.[routerId]?.tetheringHint || "",
+    usbPorts: payload?.telemetry?.usbPorts || state.routers?.[routerId]?.usbPorts || "",
     wanUp: payload?.telemetry?.wanUp === undefined ? Boolean(state.routers?.[routerId]?.wanUp) : Boolean(payload?.telemetry?.wanUp),
     wanAddress: payload?.telemetry?.wanAddress || state.routers?.[routerId]?.wanAddress || "",
     wanDevice: payload?.telemetry?.wanDevice || state.routers?.[routerId]?.wanDevice || "",
@@ -1739,6 +1753,10 @@ function refreshRouters() {
       routerMode: routerState.routerMode || "",
       uplinkMode: routerState.uplinkMode || "",
       uplinkInterface: routerState.uplinkInterface || "",
+      tetheringState: routerState.tetheringState || "",
+      tetheringError: routerState.tetheringError || "",
+      tetheringHint: routerState.tetheringHint || "",
+      usbPorts: routerState.usbPorts || "",
       wanUp: Boolean(routerState.wanUp),
       wanAddress: routerState.wanAddress || "",
       wanDevice: routerState.wanDevice || "",
@@ -2846,10 +2864,22 @@ function deviceLooksOnRouterWifi(device) {
 function getRouterTopologyGate(router, routerState) {
   const mode = String(routerState?.routerMode || "").toLowerCase();
   const uplinkMode = String(routerState?.uplinkMode || "").toLowerCase();
+  const tetheringState = String(routerState?.tetheringState || "").toLowerCase();
   if (!routerState || routerState.healthStatus !== "online") {
     return {
       ok: false,
       error: `Session start blocked: ${router.label || router.id} is not healthy enough for routed sessions.`
+    };
+  }
+  if (tetheringState === "no-device") {
+    return {
+      ok: false,
+      error: `Session start blocked: ${router.label || router.id} does not detect a USB uplink device.`,
+      detail: {
+        tetheringState: routerState.tetheringState || "",
+        tetheringError: routerState.tetheringError || "",
+        tetheringHint: routerState.tetheringHint || ""
+      }
     };
   }
   if (mode && mode !== "router") {
@@ -2867,6 +2897,28 @@ function getRouterTopologyGate(router, routerState) {
     };
   }
   return { ok: true };
+}
+
+function deriveRouterHealthStatus(action, ok, payload, currentState) {
+  if (action !== "router-health") {
+    return currentState.healthStatus || "unknown";
+  }
+  if (!ok) {
+    return "degraded";
+  }
+  const routerMode = String(payload?.telemetry?.mode || currentState.routerMode || "").toLowerCase();
+  const uplinkMode = String(payload?.telemetry?.uplinkMode || currentState.uplinkMode || "").toLowerCase();
+  const tetheringState = String(payload?.telemetry?.tetheringState || currentState.tetheringState || "").toLowerCase();
+  if (tetheringState === "no-device") {
+    return "degraded";
+  }
+  if (routerMode && routerMode !== "router") {
+    return "degraded";
+  }
+  if (uplinkMode && uplinkMode !== "router-uplink") {
+    return "degraded";
+  }
+  return "online";
 }
 
 function buildRoutingGuard(routingAudit) {

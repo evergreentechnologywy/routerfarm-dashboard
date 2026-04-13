@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RouterFarm Dashboard v20260406a</title>
+    <title>RouterFarm Desktop v20260406a</title>
     <script>
       (function setRouterFarmBasePath() {
         const baseHref = window.location.pathname.startsWith("/routerfarm") ? "/routerfarm/" : "/";
@@ -23,12 +23,12 @@
     <div id="appShell" class="shell">
       <header class="hero hero-topbar">
         <div class="hero-copy">
-          <p class="eyebrow">Internal Operations Console</p>
+          <p class="eyebrow">Native Desktop Control Room</p>
           <div class="brand-row">
             <h1>RouterFarm</h1>
             <span class="build-chip">Build 20260406a</span>
           </div>
-          <p class="subtitle">Local GL.iNet Opal operations for router-controlled Android sessions, single-device activation, and uplink-aware IP resets.</p>
+          <p class="subtitle">Desktop-native rack control for 15 Opals, LinkPro-backed uplinks, and session gating that refuses reused IPs, AP mode, or missing USB uplink devices.</p>
           <div class="hero-status-row">
             <span id="routeGuardBadge" class="badge badge-neutral">Checking routing</span>
             <span id="liveClock" class="count-pill">--</span>
@@ -99,7 +99,7 @@
       <section class="quick-actions panel">
         <div class="quick-actions-copy">
           <p class="context-label">Quick Actions</p>
-          <strong>Desktop-speed controls for filtering and switching views.</strong>
+          <strong>Fast operator controls for filtering, focusing, and switching views without losing rack context.</strong>
         </div>
         <div class="quick-actions-row">
           <button id="showAllButton" class="button button-secondary quick-action-button" type="button">Show All</button>
@@ -112,10 +112,10 @@
 
       <section class="panel router-panel">
         <div class="panel-header">
-          <div>
-            <h2>Opal Routers</h2>
-            <p class="panel-copy">15 Opal nodes with 4-phone assignment caps and one active phone allowed per router and across the full dashboard.</p>
-          </div>
+              <div>
+                <h2>Opal Routers</h2>
+                <p class="panel-copy">Each router exposes live health, USB uplink detection, and topology readiness before RouterFarm allows a phone session to start.</p>
+              </div>
           <span id="routerCount" class="count-pill">0 routers</span>
         </div>
         <div id="routerGrid" class="router-grid"></div>

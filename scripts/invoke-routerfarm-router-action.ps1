@@ -43,7 +43,10 @@ function Write-Result {
 }
 
 function Invoke-SshCommand {
-  param([string]$Command)
+  param(
+    [string]$Command,
+    [string]$StdinPath
+  )
 
   $sshArgs = @(
     "-o", "StrictHostKeyChecking=no",
@@ -59,7 +62,11 @@ function Invoke-SshCommand {
   $sshArgs += @("$username@$routerHost", $Command)
 
   try {
-    $result = & $sshPath @sshArgs 2>&1
+    $result = if ($StdinPath) {
+      Get-Content -LiteralPath $StdinPath | & $sshPath @sshArgs 2>&1
+    } else {
+      & $sshPath @sshArgs 2>&1
+    }
     $exitCode = $LASTEXITCODE
     return [pscustomobject]@{
       ExitCode = $exitCode
@@ -70,6 +77,34 @@ function Invoke-SshCommand {
       ExitCode = 1
       Output = $_.Exception.Message
     }
+  }
+}
+
+function Invoke-RouterLuaModule {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ModulePath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Expression
+  )
+
+  $tempPath = [System.IO.Path]::GetTempFileName()
+  try {
+    $luaScript = @"
+local cjson = require("cjson")
+local module = dofile("$ModulePath")
+local result = $Expression
+if result == nil then
+  print("null")
+else
+  print(cjson.encode(result))
+end
+"@
+    Set-Content -LiteralPath $tempPath -Value $luaScript -NoNewline
+    return Invoke-SshCommand -Command "cat >/tmp/routerfarm-rpc.lua; lua /tmp/routerfarm-rpc.lua" -StdinPath $tempPath
+  } finally {
+    Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
   }
 }
 
@@ -124,6 +159,8 @@ $telemetryCommands = @{
   "route" = "ip route"
   "networkConfig" = "cat /etc/config/network"
   "publicIp" = "sh -c 'if command -v curl >/dev/null 2>&1; then curl -fsSL https://api.ipify.org; elif command -v uclient-fetch >/dev/null 2>&1; then uclient-fetch -qO- https://api.ipify.org; elif command -v wget >/dev/null 2>&1; then wget -qO- https://api.ipify.org; else echo no-http-client; fi'"
+  "usbDevices" = "cat /sys/kernel/debug/usb/devices 2>/dev/null"
+  "usbPorts" = "cat /proc/gl-hw-info/usb-port 2>/dev/null"
 }
 
 if ($Action -eq "router-health") {
@@ -134,6 +171,9 @@ if ($Action -eq "router-health") {
   $routeResult = Invoke-SshCommand -Command $telemetryCommands.route
   $networkConfigResult = Invoke-SshCommand -Command $telemetryCommands.networkConfig
   $publicIpResult = Invoke-SshCommand -Command $telemetryCommands.publicIp
+  $usbDevicesResult = Invoke-SshCommand -Command $telemetryCommands.usbDevices
+  $usbPortsResult = Invoke-SshCommand -Command $telemetryCommands.usbPorts
+  $tetheringResult = Invoke-RouterLuaModule -ModulePath "/usr/lib/oui-httpd/rpc/tethering" -Expression 'module.get_status({})'
 
   if ($boardResult.ExitCode -ne 0) {
     Write-Result -Success:$false -Message "SSH command failed." -Extra @{
@@ -149,6 +189,9 @@ if ($Action -eq "router-health") {
         route = $routeResult.Output
         networkConfig = $networkConfigResult.Output
         publicIp = $publicIpResult.Output
+        usbDevices = $usbDevicesResult.Output
+        usbPorts = $usbPortsResult.Output
+        tethering = $tetheringResult.Output
       }
     }
     exit 1
@@ -171,6 +214,27 @@ if ($Action -eq "router-health") {
   $routerMode = ($modeResult.Output -split '\r?\n' | Select-Object -First 1).Trim()
   if ($publicIp -eq "no-http-client") {
     $publicIp = ""
+  }
+
+  $tetheringJson = $null
+  try {
+    $tetheringJson = $tetheringResult.Output | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    $tetheringJson = $null
+  }
+
+  $tetheringState = "unknown"
+  $tetheringError = ""
+  $tetheringHint = ""
+  if ($tetheringJson -and $tetheringJson.err_code -eq -2) {
+    $tetheringState = "no-device"
+    $tetheringError = [string]$tetheringJson.err_msg
+    $tetheringHint = "Router does not detect a USB uplink device. Verify the LinkPro USB mode is set for Internet access and the cable supports data, not power only."
+  } elseif ($tetheringJson -and $tetheringJson.err_msg) {
+    $tetheringState = "error"
+    $tetheringError = [string]$tetheringJson.err_msg
+  } elseif ($tetheringJson -and (($tetheringJson.device) -or (@($tetheringJson.devices).Count -gt 0))) {
+    $tetheringState = "detected"
   }
 
   $wanUp = $false
@@ -217,6 +281,12 @@ if ($Action -eq "router-health") {
       route = $routeResult.Output
       networkConfig = $networkConfigResult.Output
       publicIp = $publicIp
+      usbDevices = $usbDevicesResult.Output
+      usbPorts = ($usbPortsResult.Output -split '\r?\n' | Where-Object { $_.Trim() }) -join ", "
+      tetheringState = $tetheringState
+      tetheringError = $tetheringError
+      tetheringHint = $tetheringHint
+      tethering = $tetheringResult.Output
       wanUp = $wanUp
       wanAddress = $wanAddress
       wanDevice = $wanDevice

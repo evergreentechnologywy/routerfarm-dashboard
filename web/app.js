@@ -34,7 +34,7 @@ const state = {
   refreshInFlight: false
 };
 
-const desktopBridge = window.phoneFarmDesktop || null;
+const desktopBridge = window.routerFarmDesktop || window.phoneFarmDesktop || null;
 
 const BASE_PATH = window.location.pathname.startsWith("/routerfarm") ? "/routerfarm" : "";
 
@@ -337,6 +337,10 @@ function buildRoutersSignature(routers) {
     router.routerState?.lastRestartAt || "",
     router.routerState?.wanAddress || "",
     router.routerState?.publicIp || "",
+    router.routerState?.tetheringState || "",
+    router.routerState?.tetheringError || "",
+    router.routerState?.tetheringHint || "",
+    router.routerState?.usbPorts || "",
     router.routerState?.detail || "",
     router.ssid || "",
     router.mobileUplinkId || ""
@@ -741,7 +745,13 @@ function renderRouters(routers) {
     const card = document.createElement("article");
     card.className = "router-card";
     const healthStatus = router.routerState?.healthStatus || "unknown";
-    const healthClass = healthStatus === "online" ? "badge-ready" : (healthStatus === "partial" ? "badge-queued" : (healthStatus === "offline" ? "badge-failed" : "badge-neutral"));
+    const healthClass = healthStatus === "online"
+      ? "badge-ready"
+      : ((healthStatus === "partial" || healthStatus === "degraded") ? "badge-queued" : (healthStatus === "offline" ? "badge-failed" : "badge-neutral"));
+    const tetheringState = String(router.routerState?.tetheringState || "");
+    const tetheringTone = tetheringState === "detected" ? "badge-ready" : (tetheringState === "no-device" ? "badge-failed" : "badge-neutral");
+    const tetheringLabel = tetheringState ? tetheringState.replace(/-/g, " ") : "Unknown";
+    const tetheringHint = router.routerState?.tetheringHint || router.routerState?.tetheringError || "";
     card.innerHTML = `
       <header>
         <div>
@@ -764,10 +774,13 @@ function renderRouters(routers) {
         <div><span>WAN</span><strong>${escapeHtml(router.routerState?.wanUp ? "Up" : "Unknown")}${router.routerState?.wanDevice ? ` via ${escapeHtml(router.routerState.wanDevice)}` : ""}</strong></div>
         <div><span>Router Mode</span><strong>${escapeHtml(router.routerState?.routerMode || "Unknown")}</strong></div>
         <div><span>Uplink Mode</span><strong>${escapeHtml(router.routerState?.uplinkMode || "Unknown")}${router.routerState?.uplinkInterface ? ` via ${escapeHtml(router.routerState.uplinkInterface)}` : ""}</strong></div>
+        <div><span>USB Uplink</span><strong class="${escapeHtml(tetheringTone)}">${escapeHtml(tetheringLabel)}</strong></div>
+        <div><span>USB Ports</span><strong>${escapeHtml(router.routerState?.usbPorts || "Unknown")}</strong></div>
         <div><span>WAN Address</span><strong class="table-code">${escapeHtml(router.routerState?.wanAddress || "Unknown")}</strong></div>
         <div><span>Router Public IP</span><strong class="table-code">${escapeHtml(router.routerState?.publicIp || "Unknown")}</strong></div>
         <div><span>Last Restart</span><strong>${escapeHtml(router.routerState?.lastRestartAt ? formatShortTime(router.routerState.lastRestartAt) : "Never")}</strong></div>
       </div>
+      ${tetheringHint ? `<div class="router-alert">${escapeHtml(tetheringHint)}</div>` : ""}
       <div class="table-subline">${escapeHtml(router.routerState?.detail || "No router health detail yet.")}</div>
       <div class="router-actions">
         <button class="button button-secondary" type="button" data-router-action="router-health">Health</button>
