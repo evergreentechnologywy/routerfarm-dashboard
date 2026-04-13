@@ -21,8 +21,8 @@ function getCliArg(name) {
 }
 
 function getDesktopTestSpec() {
-  const openControlSerial = getCliArg("--phonefarm-test-open-control");
-  const startSessionSerial = getCliArg("--phonefarm-test-start-session");
+  const openControlSerial = getCliArg("--routerfarm-test-open-control") || getCliArg("--phonefarm-test-open-control");
+  const startSessionSerial = getCliArg("--routerfarm-test-start-session") || getCliArg("--phonefarm-test-start-session");
   const action = openControlSerial ? "open-control" : (startSessionSerial ? "start-session" : "");
   const serial = openControlSerial || startSessionSerial;
   if (!action || !serial) {
@@ -32,8 +32,8 @@ function getDesktopTestSpec() {
   return {
     action,
     serial,
-    outputPath: getCliArg("--phonefarm-test-output"),
-    exitWhenDone: process.argv.includes("--phonefarm-test-exit")
+    outputPath: getCliArg("--routerfarm-test-output") || getCliArg("--phonefarm-test-output"),
+    exitWhenDone: process.argv.includes("--routerfarm-test-exit") || process.argv.includes("--phonefarm-test-exit")
   };
 }
 
@@ -58,6 +58,7 @@ function pathExists(targetPath) {
 
 function resolveWorkspaceRoot() {
   const candidates = [
+    process.env.ROUTERFARM_ROOT,
     process.env.PHONEFARM_ROOT,
     DEFAULT_WORKSPACE_ROOT,
     path.join(__dirname, "..")
@@ -69,13 +70,13 @@ function resolveWorkspaceRoot() {
     }
   }
 
-  throw new Error("RouterFarm workspace was not found. Expected C:\\RouterFarm or PHONEFARM_ROOT.");
+  throw new Error("RouterFarm workspace was not found. Expected C:\\RouterFarm, ROUTERFARM_ROOT, or PHONEFARM_ROOT.");
 }
 
 function getWorkspaceContext() {
   const root = resolveWorkspaceRoot();
   const settingsPath = path.join(root, "config", "settings.json");
-  let settings = { host: "127.0.0.1", port: 7780, nodePath: "" };
+  let settings = { host: "127.0.0.1", port: 7781, nodePath: "" };
 
   try {
     settings = { ...settings, ...JSON.parse(fs.readFileSync(settingsPath, "utf8")) };
@@ -87,7 +88,7 @@ function getWorkspaceContext() {
     root,
     settingsPath,
     settings,
-    baseUrl: `http://${settings.host || "127.0.0.1"}:${Number(settings.port) || 7780}`,
+    baseUrl: `http://${settings.host || "127.0.0.1"}:${Number(settings.port) || 7781}`,
     serverScript: path.join(root, "server.js")
   };
 }
@@ -126,6 +127,7 @@ function waitForServer(url, timeoutMs) {
 
 function resolveNodeCommand(settings) {
   const candidates = [
+    process.env.ROUTERFARM_NODE_PATH,
     process.env.PHONEFARM_NODE_PATH,
     settings.nodePath,
     "C:\\Program Files\\nodejs\\node.exe",

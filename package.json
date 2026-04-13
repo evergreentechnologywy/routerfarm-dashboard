@@ -2,18 +2,20 @@
   "name": "routerfarm-dashboard",
   "version": "1.1.0",
   "private": true,
+  "author": "IRONMAN <evergreentechnology.wy@gmail.com>",
   "description": "Native Windows dashboard for router-controlled Android farm operations",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
     "start:desktop": "electron .",
     "test:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test-routerfarm-smoke.ps1",
-    "dist:desktop": "electron-builder --win portable nsis --x64"
+    "dist:desktop": "electron-builder --win portable nsis --x64 --config.win.signAndEditExecutable=false"
   },
   "build": {
     "appId": "com.routerfarm.desktop",
     "productName": "RouterFarm",
     "artifactName": "${productName} ${version}.${ext}",
+    "asar": false,
     "files": [
       "assets/**/*",
       "electron/**/*",

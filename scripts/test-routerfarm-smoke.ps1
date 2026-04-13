@@ -12,7 +12,7 @@ function Get-Settings {
 
   return [pscustomobject]@{
     host = "127.0.0.1"
-    port = 7780
+    port = 7781
   }
 }
 
