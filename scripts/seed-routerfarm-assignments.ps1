@@ -22,32 +22,35 @@ if (-not $routers.Count) {
   throw "No enabled routers found in $RoutersPath"
 }
 
-$slotMap = @{}
+$sourceDevices = @($devicesConfig.devices)
+$assignmentPool = @{}
 foreach ($router in $routers) {
-  $slotMap[$router.id] = New-Object System.Collections.Generic.List[object]
+  $assignmentPool[$router.id] = New-Object System.Collections.Generic.List[object]
 }
 
-$devices = @($devicesConfig.devices)
-foreach ($device in $devices) {
-  if (-not ($device.PSObject.Properties.Name -contains "routerId")) {
-    $device | Add-Member -NotePropertyName routerId -NotePropertyValue ""
+$normalizedDevices = foreach ($sourceDevice in $sourceDevices) {
+  $device = [ordered]@{
+    serial = [string]$sourceDevice.serial
+    phoneNumber = if ($null -ne $sourceDevice.phoneNumber -and [int]$sourceDevice.phoneNumber -gt 0) { [int]$sourceDevice.phoneNumber } else { $null }
+    nickname = [string]$sourceDevice.nickname
+    role = "router-client"
+    parentHotspotSerial = [string]$sourceDevice.parentHotspotSerial
+    routerId = ""
+    routerSlot = $null
   }
-  if (-not ($device.PSObject.Properties.Name -contains "routerSlot")) {
-    $device | Add-Member -NotePropertyName routerSlot -NotePropertyValue $null
+
+  $existingRouterId = [string]$sourceDevice.routerId
+  $existingRouterSlot = if ($null -ne $sourceDevice.routerSlot -and [int]$sourceDevice.routerSlot -gt 0) { [int]$sourceDevice.routerSlot } else { $null }
+  if ($PreserveExistingAssignments -and $existingRouterId -and $assignmentPool.ContainsKey($existingRouterId)) {
+    $device.routerId = $existingRouterId
+    $device.routerSlot = $existingRouterSlot
+    $assignmentPool[$existingRouterId].Add([pscustomobject]$device) | Out-Null
   }
-  $device.role = "router-client"
-  $routerIsEnabled = $device.routerId -and $slotMap.ContainsKey([string]$device.routerId)
-  if ($PreserveExistingAssignments -and $routerIsEnabled) {
-    if ($slotMap.ContainsKey($device.routerId)) {
-      $slotMap[$device.routerId].Add($device) | Out-Null
-    }
-  } else {
-    $device.routerId = ""
-    $device.routerSlot = $null
-  }
+
+  [pscustomobject]$device
 }
 
-$unassigned = @($devices | Where-Object { -not $_.routerId })
+$unassigned = @($normalizedDevices | Where-Object { -not $_.routerId })
 $routerIndex = 0
 
 foreach ($device in $unassigned) {
@@ -55,19 +58,23 @@ foreach ($device in $unassigned) {
   for ($offset = 0; $offset -lt $routers.Count; $offset += 1) {
     $candidate = $routers[($routerIndex + $offset) % $routers.Count]
     $maxAssigned = if ($candidate.maxAssignedDevices) { [int]$candidate.maxAssignedDevices } else { 4 }
-    if ($slotMap[$candidate.id].Count -lt $maxAssigned) {
-      $usedSlots = @($slotMap[$candidate.id] | ForEach-Object { [int]($_.routerSlot) } | Where-Object { $_ -gt 0 })
-      $slot = 1
-      while ($usedSlots -contains $slot) {
-        $slot += 1
-      }
-      $device.routerId = $candidate.id
-      $device.routerSlot = $slot
-      $slotMap[$candidate.id].Add($device) | Out-Null
-      $routerIndex = (($routerIndex + $offset) % $routers.Count) + 1
-      $assigned = $true
-      break
+    $bucket = $assignmentPool[$candidate.id]
+    if ($bucket.Count -ge $maxAssigned) {
+      continue
     }
+
+    $usedSlots = @($bucket | ForEach-Object { [int]$_.routerSlot } | Where-Object { $_ -gt 0 })
+    $slot = 1
+    while ($usedSlots -contains $slot) {
+      $slot += 1
+    }
+
+    $device.routerId = $candidate.id
+    $device.routerSlot = $slot
+    $bucket.Add($device) | Out-Null
+    $routerIndex = (($routerIndex + $offset) % $routers.Count) + 1
+    $assigned = $true
+    break
   }
 
   if (-not $assigned) {
@@ -75,13 +82,15 @@ foreach ($device in $unassigned) {
   }
 }
 
-$devicesConfig.devices = $devices
-$devicesConfig | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $DevicesPath -Encoding UTF8
+$outputConfig = [ordered]@{
+  devices = @($normalizedDevices)
+}
+($outputConfig | ConvertTo-Json -Depth 8) + "`n" | Set-Content -LiteralPath $DevicesPath -Encoding UTF8
 
-[PSCustomObject]@{
+[pscustomobject]@{
   ok = $true
   routers = $routers.Count
-  devices = $devices.Count
-  assigned = @($devices | Where-Object { $_.routerId }).Count
+  devices = $normalizedDevices.Count
+  assigned = @($normalizedDevices | Where-Object { $_.routerId }).Count
   preservedExistingAssignments = [bool]$PreserveExistingAssignments
 } | ConvertTo-Json -Depth 6 -Compress

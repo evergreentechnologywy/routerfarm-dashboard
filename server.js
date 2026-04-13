@@ -291,7 +291,8 @@ function loadJson(filePath, fallback) {
     return JSON.parse(JSON.stringify(fallback));
   }
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const raw = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+    return JSON.parse(raw);
   } catch (error) {
     return JSON.parse(JSON.stringify(fallback));
   }
@@ -1314,7 +1315,7 @@ async function enforceRouterRestartBeforeSession(serial, user, device) {
   updateDeviceState(serial, {
     prepMessage: `Router restart completed for ${router.label || router.id}; verifying fresh IP`
   });
-  return { ok: true, routerRestarted: true, reconnectResult };
+  return { ok: true, routerRestarted: true, reconnectResult: connectResult };
 }
 
 function parseJsonPayload(raw) {
