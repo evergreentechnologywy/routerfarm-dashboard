@@ -5,11 +5,20 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$Action,
 
-  [string]$RoutersPath = "C:\RouterFarm\config\routers.json",
-  [string]$SettingsPath = "C:\RouterFarm\config\settings.json"
+  [string]$RoutersPath,
+  [string]$SettingsPath
 )
 
 $ErrorActionPreference = "Stop"
+
+$scriptRoot = Split-Path -Parent $PSCommandPath
+$projectRoot = Split-Path -Parent $scriptRoot
+if (-not $RoutersPath) {
+  $RoutersPath = Join-Path $projectRoot "config\routers.json"
+}
+if (-not $SettingsPath) {
+  $SettingsPath = Join-Path $projectRoot "config\settings.json"
+}
 
 function Write-Result {
   param(
@@ -109,6 +118,7 @@ if (-not $routerCommand) {
 
 $telemetryCommands = @{
   "board" = "ubus call system board"
+  "mode" = "uci -q get glconfig.general.mode"
   "wan" = "ifstatus wan"
   "wwan" = "ifstatus wwan"
   "route" = "ip route"
@@ -118,6 +128,7 @@ $telemetryCommands = @{
 
 if ($Action -eq "router-health") {
   $boardResult = Invoke-SshCommand -Command $telemetryCommands.board
+  $modeResult = Invoke-SshCommand -Command $telemetryCommands.mode
   $wanResult = Invoke-SshCommand -Command $telemetryCommands.wan
   $wwanResult = Invoke-SshCommand -Command $telemetryCommands.wwan
   $routeResult = Invoke-SshCommand -Command $telemetryCommands.route
@@ -132,6 +143,7 @@ if ($Action -eq "router-health") {
       requiresConfiguration = $true
       telemetry = @{
         board = $boardResult.Output
+        mode = $modeResult.Output
         wan = $wanResult.Output
         wwan = $wwanResult.Output
         route = $routeResult.Output
@@ -156,6 +168,7 @@ if ($Action -eq "router-health") {
   }
 
   $publicIp = ($publicIpResult.Output -split '\r?\n' | Select-Object -First 1).Trim()
+  $routerMode = ($modeResult.Output -split '\r?\n' | Select-Object -First 1).Trim()
   if ($publicIp -eq "no-http-client") {
     $publicIp = ""
   }
@@ -198,6 +211,7 @@ if ($Action -eq "router-health") {
     detail = $boardResult.Output
     telemetry = @{
       board = $boardResult.Output
+      mode = $routerMode
       wan = $wanResult.Output
       wwan = $wwanResult.Output
       route = $routeResult.Output

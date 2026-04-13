@@ -762,6 +762,8 @@ function renderRouters(routers) {
         <div><span>Reachability</span><strong>${escapeHtml(buildRouterReachability(router))}</strong></div>
         <div><span>Last Check</span><strong>${escapeHtml(router.routerState?.lastCheckedAt ? formatShortTime(router.routerState.lastCheckedAt) : "Not checked")}</strong></div>
         <div><span>WAN</span><strong>${escapeHtml(router.routerState?.wanUp ? "Up" : "Unknown")}${router.routerState?.wanDevice ? ` via ${escapeHtml(router.routerState.wanDevice)}` : ""}</strong></div>
+        <div><span>Router Mode</span><strong>${escapeHtml(router.routerState?.routerMode || "Unknown")}</strong></div>
+        <div><span>Uplink Mode</span><strong>${escapeHtml(router.routerState?.uplinkMode || "Unknown")}${router.routerState?.uplinkInterface ? ` via ${escapeHtml(router.routerState.uplinkInterface)}` : ""}</strong></div>
         <div><span>WAN Address</span><strong class="table-code">${escapeHtml(router.routerState?.wanAddress || "Unknown")}</strong></div>
         <div><span>Router Public IP</span><strong class="table-code">${escapeHtml(router.routerState?.publicIp || "Unknown")}</strong></div>
         <div><span>Last Restart</span><strong>${escapeHtml(router.routerState?.lastRestartAt ? formatShortTime(router.routerState.lastRestartAt) : "Never")}</strong></div>
@@ -1219,6 +1221,19 @@ function buildRouterReachability(router) {
   return open.length ? open.join(" / ") : "No management ports detected";
 }
 
+function getRouterForDevice(device) {
+  return (state.data?.routers || []).find(router => router.id === device?.routerId) || null;
+}
+
+function routerBlocksSession(router) {
+  const routerState = router?.routerState || {};
+  const routerMode = String(routerState.routerMode || "").toLowerCase();
+  const uplinkMode = String(routerState.uplinkMode || "").toLowerCase();
+  return routerState.healthStatus !== "online" ||
+    (routerMode && routerMode !== "router") ||
+    (uplinkMode && uplinkMode !== "router-uplink");
+}
+
 function shouldDisableAction(device, action) {
   if (!device?.serial) return true;
   if (isActionPending(device.serial, action)) return true;
@@ -1230,9 +1245,11 @@ function shouldDisableAction(device, action) {
       Boolean(state.data?.routingGuard?.blocked);
   }
   if (action === "start-session") {
+    const assignedRouter = getRouterForDevice(device);
     return Boolean(state.data?.routingGuard?.blocked) ||
       !device.activationLock?.allowed ||
-      Boolean(state.data?.settings?.ipReusePolicy?.blockSessionStartOnReuse && device.publicIp?.reusePolicyViolation);
+      Boolean(state.data?.settings?.ipReusePolicy?.blockSessionStartOnReuse && device.publicIp?.reusePolicyViolation) ||
+      (device.routerId && routerBlocksSession(assignedRouter));
   }
   if (action === "connect-router" || action === "reset-uplink-ip") {
     return !device.routerId;

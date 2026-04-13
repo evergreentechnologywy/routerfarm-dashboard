@@ -553,6 +553,9 @@ function buildRouterStatuses(visibleDevices) {
         healthStatus: routerState.healthStatus || "unknown",
         detail: routerState.detail || "",
         reachability: routerState.reachability || { ssh: false, http: false, https: false },
+        routerMode: routerState.routerMode || "",
+        uplinkMode: routerState.uplinkMode || "",
+        uplinkInterface: routerState.uplinkInterface || "",
         wanUp: Boolean(routerState.wanUp),
         wanAddress: routerState.wanAddress || "",
         wanDevice: routerState.wanDevice || "",
@@ -1212,6 +1215,9 @@ function executeRouterAction(routerId, action, body) {
     lastRestartAt: action === "reboot-router" && ok ? new Date().toISOString() : (state.routers?.[routerId]?.lastRestartAt || ""),
     healthStatus: action === "router-health" ? (ok ? "online" : "degraded") : ((state.routers?.[routerId]?.healthStatus) || "unknown"),
     detail: payload?.detail || payload?.message || String(script.stderr || "").trim(),
+    routerMode: payload?.telemetry?.mode || state.routers?.[routerId]?.routerMode || "",
+    uplinkMode: payload?.telemetry?.uplinkMode || state.routers?.[routerId]?.uplinkMode || "",
+    uplinkInterface: payload?.telemetry?.uplinkInterface || state.routers?.[routerId]?.uplinkInterface || "",
     wanUp: payload?.telemetry?.wanUp === undefined ? Boolean(state.routers?.[routerId]?.wanUp) : Boolean(payload?.telemetry?.wanUp),
     wanAddress: payload?.telemetry?.wanAddress || state.routers?.[routerId]?.wanAddress || "",
     wanDevice: payload?.telemetry?.wanDevice || state.routers?.[routerId]?.wanDevice || "",
@@ -1286,6 +1292,24 @@ async function enforceRouterRestartBeforeSession(serial, user, device) {
   const router = device.routerId ? getRouterConfig(device.routerId) : null;
   if (!router) {
     return { ok: false, error: "Assign this phone to a router before starting a session." };
+  }
+
+  updateDeviceState(serial, {
+    prepMessage: `Checking ${router.label || router.id} before session start`
+  });
+  const healthResult = executeRouterAction(router.id, "router-health", {});
+  if (!healthResult.ok) {
+    updateDeviceState(serial, {
+      prepMessage: healthResult.error || `Router health check failed for ${router.label || router.id}`
+    });
+    return { ok: false, error: healthResult.error || "Router health check failed", detail: healthResult.payload || null };
+  }
+
+  const routerState = state.routers?.[router.id] || {};
+  const topologyGate = getRouterTopologyGate(router, routerState);
+  if (!topologyGate.ok) {
+    updateDeviceState(serial, { prepMessage: topologyGate.error });
+    return { ok: false, error: topologyGate.error, detail: topologyGate.detail || null };
   }
 
   updateDeviceState(serial, {
@@ -1572,7 +1596,15 @@ function refreshRouters() {
       lastCheckedAt: routerState.lastCheckedAt || "",
       healthStatus: routerState.healthStatus || "unknown",
       detail: routerState.detail || "",
-      reachability: routerState.reachability || { ssh: false, http: false, https: false }
+      reachability: routerState.reachability || { ssh: false, http: false, https: false },
+      routerMode: routerState.routerMode || "",
+      uplinkMode: routerState.uplinkMode || "",
+      uplinkInterface: routerState.uplinkInterface || "",
+      wanUp: Boolean(routerState.wanUp),
+      wanAddress: routerState.wanAddress || "",
+      wanDevice: routerState.wanDevice || "",
+      publicIp: routerState.publicIp || "",
+      telemetryCheckedAt: routerState.telemetryCheckedAt || ""
     };
   }
   routerCache = next;
@@ -2522,6 +2554,32 @@ function buildActivationLock(device, activeSession = getActiveSession()) {
 function deviceLooksOnRouterWifi(device) {
   const interfaceName = String(device?.network?.interface || "").toLowerCase();
   return interfaceName.startsWith("wlan") || interfaceName.includes("wifi");
+}
+
+function getRouterTopologyGate(router, routerState) {
+  const mode = String(routerState?.routerMode || "").toLowerCase();
+  const uplinkMode = String(routerState?.uplinkMode || "").toLowerCase();
+  if (!routerState || routerState.healthStatus !== "online") {
+    return {
+      ok: false,
+      error: `Session start blocked: ${router.label || router.id} is not healthy enough for routed sessions.`
+    };
+  }
+  if (mode && mode !== "router") {
+    return {
+      ok: false,
+      error: `Session start blocked: ${router.label || router.id} is in ${mode} mode, not router mode.`,
+      detail: { routerMode: routerState.routerMode || "", uplinkMode: routerState.uplinkMode || "" }
+    };
+  }
+  if (uplinkMode && uplinkMode !== "router-uplink") {
+    return {
+      ok: false,
+      error: `Session start blocked: ${router.label || router.id} uplink is ${uplinkMode} instead of router-uplink.`,
+      detail: { routerMode: routerState.routerMode || "", uplinkMode: routerState.uplinkMode || "", uplinkInterface: routerState.uplinkInterface || "" }
+    };
+  }
+  return { ok: true };
 }
 
 function buildRoutingGuard(routingAudit) {
