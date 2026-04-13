@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RouterFarm Dashboard v20260406a</title>
+    <script>
+      (function setRouterFarmBasePath() {
+        const baseHref = window.location.pathname.startsWith("/routerfarm") ? "/routerfarm/" : "/";
+        const base = document.createElement("base");
+        base.href = baseHref;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <link rel="stylesheet" href="styles.css?v=20260406a" />
+  </head>
+  <body>
+    <div class="shell-backdrop" aria-hidden="true">
+      <div class="backdrop-orb backdrop-orb-left"></div>
+      <div class="backdrop-orb backdrop-orb-right"></div>
+      <div class="backdrop-grid"></div>
+    </div>
+    <div id="appShell" class="shell">
+      <header class="hero hero-topbar">
+        <div class="hero-copy">
+          <p class="eyebrow">Internal Operations Console</p>
+          <div class="brand-row">
+            <h1>RouterFarm</h1>
+            <span class="build-chip">Build 20260406a</span>
+          </div>
+          <p class="subtitle">Local GL.iNet Opal operations for router-controlled Android sessions, single-device activation, and uplink-aware IP resets.</p>
+          <div class="hero-status-row">
+            <span id="routeGuardBadge" class="badge badge-neutral">Checking routing</span>
+            <span id="liveClock" class="count-pill">--</span>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <div class="user-pill" id="currentUser"></div>
+          <button id="refreshButton" class="button button-secondary" type="button">Refresh</button>
+          <button id="logoutButton" class="button button-ghost" type="button">Logout</button>
+        </div>
+      </header>
+
+      <section class="stats-grid" id="statsGrid"></section>
+
+      <section class="toolbar panel">
+        <div class="toolbar-left">
+          <label class="search-field">
+            <span class="field-label">Search</span>
+            <input id="searchInput" type="search" placeholder="Search phone, serial, Gmail, or number" />
+          </label>
+          <label class="select-field">
+            <span class="field-label">Status</span>
+            <select id="statusFilter">
+              <option value="all">All statuses</option>
+              <option value="online">Online</option>
+              <option value="offline">Offline</option>
+              <option value="idle">Idle</option>
+              <option value="queued">Queued</option>
+              <option value="preparing">Preparing</option>
+              <option value="ready">Ready</option>
+              <option value="failed">Failed</option>
+            </select>
+          </label>
+          <label class="select-field">
+            <span class="field-label">Role</span>
+            <select id="roleFilter">
+              <option value="all">All roles</option>
+              <option value="sim-direct">SIM Direct</option>
+              <option value="opal-client">Opal Client</option>
+              <option value="hotspot-client">Hotspot Client</option>
+            </select>
+          </label>
+        </div>
+        <div class="toolbar-right">
+          <label class="toggle-chip">
+            <input id="warningsOnlyToggle" type="checkbox" />
+            <span>Warnings Only</span>
+          </label>
+          <label class="toggle-chip">
+            <input id="readyOnlyToggle" type="checkbox" />
+            <span>Ready Only</span>
+          </label>
+          <div class="view-toggle" role="tablist" aria-label="View mode">
+            <button id="cardViewButton" class="view-toggle-button is-active" type="button">Card View</button>
+            <button id="tableViewButton" class="view-toggle-button" type="button">Table View</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="context-bar panel">
+        <div class="context-copy">
+          <p class="context-label">Workspace Context</p>
+          <strong id="contextSummary">Loading dashboard state</strong>
+        </div>
+        <div id="contextChips" class="context-chips"></div>
+      </section>
+
+      <section class="quick-actions panel">
+        <div class="quick-actions-copy">
+          <p class="context-label">Quick Actions</p>
+          <strong>Desktop-speed controls for filtering and switching views.</strong>
+        </div>
+        <div class="quick-actions-row">
+          <button id="showAllButton" class="button button-secondary quick-action-button" type="button">Show All</button>
+          <button id="showReadyButton" class="button button-secondary quick-action-button" type="button">Ready</button>
+          <button id="showWarningsButton" class="button button-secondary quick-action-button" type="button">Warnings</button>
+          <button id="toggleViewButton" class="button button-secondary quick-action-button" type="button">Toggle View</button>
+          <button id="focusSearchButton" class="button button-secondary quick-action-button" type="button">Focus Search</button>
+        </div>
+      </section>
+
+      <section class="panel router-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Opal Routers</h2>
+            <p class="panel-copy">15 Opal nodes with 4-phone assignment caps and one active phone allowed per router and across the full dashboard.</p>
+          </div>
+          <span id="routerCount" class="count-pill">0 routers</span>
+        </div>
+        <div id="routerGrid" class="router-grid"></div>
+      </section>
+
+      <main class="dashboard-layout">
+        <section class="main-column">
+          <section class="panel devices-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Devices</h2>
+                <p class="panel-copy">Visible devices with Opal assignment, activation locks, prep timing, IP verification, and direct control actions.</p>
+              </div>
+              <span id="deviceCount" class="count-pill">0 devices</span>
+            </div>
+
+            <div id="cardView" class="device-grid"></div>
+
+            <div id="tableView" class="table-shell" hidden>
+              <table class="device-table">
+                <thead>
+                  <tr>
+                    <th>Device</th>
+                    <th>Serial</th>
+                    <th>Status</th>
+                    <th>Role</th>
+                    <th>Router</th>
+                    <th>Session</th>
+                    <th>Prep</th>
+                    <th>Progress</th>
+                    <th>Gmail</th>
+                    <th>Public IP</th>
+                    <th>Last Checked</th>
+                    <th>IP Warning</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="deviceTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <aside class="side-column">
+          <section class="panel queue-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Queue</h2>
+                <p class="panel-copy">Global prep flow with live elapsed timing for the active worker.</p>
+              </div>
+              <span id="queueLengthBadge" class="count-pill">0 queued</span>
+            </div>
+            <div class="queue-overview">
+              <div class="queue-overview-card">
+                <span>Active Prep</span>
+                <strong id="activePrepDevice">Idle</strong>
+                <small id="activePrepCountdown">No active countdown</small>
+                <div class="queue-progress" aria-hidden="true">
+                  <div id="activePrepProgressBar" class="queue-progress-bar"></div>
+                </div>
+              </div>
+              <div class="queue-overview-card">
+                <span>Last Completed</span>
+                <strong id="lastCompletedPrep">No completed prep yet</strong>
+                <small id="lastCompletedPrepMeta">Waiting for first completion</small>
+              </div>
+            </div>
+            <div id="queueList" class="queue-list"></div>
+          </section>
+
+          <section class="panel activity-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Activity</h2>
+                <p class="panel-copy">Recent actions and warnings affecting operator workflow.</p>
+              </div>
+            </div>
+            <div id="activityList" class="activity-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Routing Safety</h2>
+                <p class="panel-copy">Checks to confirm remote dashboard access stays separate from phone traffic, with hard blocks when the PC is acting like a gateway or proxy.</p>
+              </div>
+              <span id="routingStatusBadge" class="badge badge-neutral">Checking</span>
+            </div>
+            <p id="routingSummary" class="panel-copy panel-copy-tight"></p>
+            <div id="routingPaths" class="routing-paths"></div>
+            <div id="routingChecks" class="activity-list"></div>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <template id="deviceCardTemplate">
+      <article class="device-card">
+        <div class="device-card-header">
+          <div>
+            <p class="device-kicker">Device</p>
+            <h3 class="device-name"></h3>
+            <p class="device-serial"></p>
+          </div>
+          <div class="card-badges">
+            <span class="badge status-badge"></span>
+            <span class="badge role-badge"></span>
+            <span class="badge prep-badge"></span>
+            <span class="badge duplicate-badge" hidden>Duplicate IP</span>
+            <span class="badge reuse-badge" hidden>Reused IP</span>
+          </div>
+        </div>
+
+        <div class="device-meta-grid">
+          <div class="meta-cell">
+            <span>Gmail</span>
+            <strong class="gmail-value"></strong>
+          </div>
+          <div class="meta-cell">
+            <span>Public IP</span>
+            <strong class="public-ip-value"></strong>
+          </div>
+          <div class="meta-cell">
+            <span>Last Checked</span>
+            <strong class="last-checked-value"></strong>
+          </div>
+          <div class="meta-cell">
+            <span>IP Status</span>
+            <strong class="ip-status-value"></strong>
+          </div>
+          <div class="meta-cell">
+            <span>Router</span>
+            <strong class="router-value"></strong>
+          </div>
+          <div class="meta-cell">
+            <span>Route Risk</span>
+            <strong class="route-risk-value"></strong>
+          </div>
+          <div class="meta-cell">
+            <span>Session</span>
+            <strong class="session-value"></strong>
+          </div>
+          <div class="meta-cell">
+            <span>Prep Timer</span>
+            <strong class="prep-timer-value"></strong>
+            <div class="prep-progress" aria-hidden="true">
+              <div class="prep-progress-bar"></div>
+            </div>
+          </div>
+          <div class="meta-cell">
+            <span>Last Prep</span>
+            <strong class="last-prep-value"></strong>
+          </div>
+          <div class="meta-cell">
+            <span>Viewer Launch</span>
+            <strong class="viewer-launch-value"></strong>
+          </div>
+          <div class="meta-cell">
+            <span>Activation Lock</span>
+            <strong class="activation-lock-value"></strong>
+          </div>
+          <div class="meta-cell">
+            <span>ADB Serial</span>
+            <strong class="transport-value"></strong>
+          </div>
+        </div>
+
+        <div class="device-state-strip">
+          <div class="state-pill state-changed"></div>
+          <div class="state-pill state-duplicate"></div>
+          <div class="state-pill state-ip-history"></div>
+          <div class="state-pill state-viewer-launch"></div>
+          <div class="state-pill state-prep-message"></div>
+        </div>
+
+        <div class="device-actions">
+          <button class="button button-secondary action-edit" type="button">Edit Device</button>
+          <button class="button button-secondary action-open" type="button">Open Control</button>
+          <button class="button button-primary action-prep" type="button">Prep Device</button>
+          <button class="button button-secondary action-connect-router" type="button">Connect Router</button>
+          <button class="button button-secondary action-reset-uplink" type="button">Reset Uplink</button>
+          <button class="button button-secondary action-airplane" type="button">Engage Airplane</button>
+          <button class="button button-secondary action-recover" type="button">Recover Radios</button>
+          <button class="button button-secondary action-check-ip" type="button">Check IP</button>
+          <button class="button button-secondary action-start" type="button">Start Session</button>
+          <button class="button button-secondary action-stop" type="button">Stop Session</button>
+        </div>
+      </article>
+    </template>
+
+    <div id="deviceEditorModal" class="modal-shell" hidden>
+      <div class="modal-backdrop" data-close-modal="device-editor"></div>
+      <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="deviceEditorTitle">
+        <div class="panel-header">
+          <div>
+            <h2 id="deviceEditorTitle">Edit Device</h2>
+            <p id="deviceEditorSubtitle" class="panel-copy panel-copy-tight">Update router assignment and role metadata.</p>
+          </div>
+          <button id="deviceEditorCloseButton" class="button button-ghost" type="button">Close</button>
+        </div>
+        <form id="deviceEditorForm" class="editor-form">
+          <label class="select-field">
+            <span class="field-label">Nickname</span>
+            <input id="editorNickname" type="text" maxlength="80" />
+          </label>
+          <label class="select-field">
+            <span class="field-label">Phone Number</span>
+            <input id="editorPhoneNumber" type="number" min="1" step="1" />
+          </label>
+          <label class="select-field">
+            <span class="field-label">Role</span>
+            <select id="editorRole">
+              <option value="sim-direct">SIM Direct</option>
+              <option value="opal-client">Opal Client</option>
+              <option value="hotspot-client">Hotspot Client</option>
+            </select>
+          </label>
+          <label class="select-field">
+            <span class="field-label">Router</span>
+            <select id="editorRouterId"></select>
+          </label>
+          <label class="select-field">
+            <span class="field-label">Router Slot</span>
+            <input id="editorRouterSlot" type="number" min="1" step="1" />
+          </label>
+          <label class="select-field">
+            <span class="field-label">Parent Hotspot Serial</span>
+            <input id="editorParentHotspotSerial" type="text" maxlength="80" />
+          </label>
+          <div class="editor-actions">
+            <button id="deviceEditorSaveButton" class="button button-primary" type="submit">Save Device</button>
+            <button id="deviceEditorCancelButton" class="button button-secondary" type="button">Cancel</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <script src="app.js?v=20260406a"></script>
+  </body>
+</html>

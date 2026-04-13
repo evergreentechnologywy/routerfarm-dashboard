@@ -1,0 +1,13 @@
+{
+  "users": [
+    {
+      "username": "admin",
+      "displayName": "Admin",
+      "role": "admin",
+      "allowedDevices": [
+        "*"
+      ],
+      "passwordHash": "pbkdf2$210000$d5d2d23da02115eb83c4ee3f060ee253$efcd13bca1e29d682e132ab345da8ecd9f38f6b5a9c211fee4e50a3dfa6609f3"
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+{
+  "devices": [
+    {
+      "serial": "6F9B97EE",
+      "nickname": "Phone 01",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "phoneNumber": 1,
+      "routerId": "opal-01",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23B3C605",
+      "nickname": "Phone 02",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "phoneNumber": 2,
+      "routerId": "opal-02",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23B6C60B",
+      "nickname": "Phone 03",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "phoneNumber": 3,
+      "routerId": "opal-03",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23BFC680",
+      "nickname": "Phone 04",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "phoneNumber": 4,
+      "routerId": "opal-04",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23BFC6BD",
+      "nickname": "Phone 05",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "phoneNumber": 5,
+      "routerId": "opal-05",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23C7C69C",
+      "nickname": "Phone 06",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "phoneNumber": 6,
+      "routerId": "opal-06",
+      "routerSlot": 1
+    },
+    {
+      "serial": "7001963A",
+      "nickname": "Phone 07",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "phoneNumber": 7,
+      "routerId": "opal-07",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23AAC64B",
+      "phoneNumber": 8,
+      "nickname": "Phone 08",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-08",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23AAC652",
+      "phoneNumber": 9,
+      "nickname": "Phone 09",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-09",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23BFC639",
+      "phoneNumber": 10,
+      "nickname": "Phone 10",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-10",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23DFC6CA",
+      "phoneNumber": 11,
+      "nickname": "Phone 11",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-11",
+      "routerSlot": 1
+    },
+    {
+      "serial": "A69CAA34",
+      "phoneNumber": 12,
+      "nickname": "Phone 12",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-12",
+      "routerSlot": 1
+    },
+    {
+      "serial": "A6A5AAB9",
+      "phoneNumber": 13,
+      "nickname": "Phone 13",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-13",
+      "routerSlot": 1
+    },
+    {
+      "serial": "AC7BAAD5",
+      "phoneNumber": 14,
+      "nickname": "Phone 14",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-14",
+      "routerSlot": 1
+    },
+    {
+      "serial": "700197EC",
+      "phoneNumber": 15,
+      "nickname": "Phone 15",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-15",
+      "routerSlot": 1
+    },
+    {
+      "serial": "A6D6AA6C",
+      "phoneNumber": 16,
+      "nickname": "Phone 16",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-01",
+      "routerSlot": 2
+    },
+    {
+      "serial": "A69CAA5F",
+      "phoneNumber": 17,
+      "nickname": "Phone 17",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-02",
+      "routerSlot": 2
+    },
+    {
+      "serial": "6F6296C5",
+      "phoneNumber": 18,
+      "nickname": "Phone 18",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-03",
+      "routerSlot": 2
+    },
+    {
+      "serial": "23DFC6DE",
+      "phoneNumber": 19,
+      "nickname": "Phone 19",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-04",
+      "routerSlot": 2
+    },
+    {
+      "serial": "23BAC6D1",
+      "phoneNumber": 20,
+      "nickname": "Phone 20",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-05",
+      "routerSlot": 2
+    },
+    {
+      "serial": "23A2C618",
+      "phoneNumber": 21,
+      "nickname": "Phone 21",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-06",
+      "routerSlot": 2
+    },
+    {
+      "serial": "23BFC671",
+      "phoneNumber": 22,
+      "nickname": "Phone 22",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-07",
+      "routerSlot": 2
+    },
+    {
+      "serial": "6FA09768",
+      "phoneNumber": 23,
+      "nickname": "Phone 23",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-08",
+      "routerSlot": 2
+    },
+    {
+      "serial": "A6B2AA09",
+      "phoneNumber": 24,
+      "nickname": "Phone 24",
+      "role": "router-client",
+      "parentHotspotSerial": "",
+      "routerId": "opal-09",
+      "routerSlot": 2
+    }
+  ]
+}

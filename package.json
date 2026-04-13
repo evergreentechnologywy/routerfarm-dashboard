@@ -1,0 +1,61 @@
+{
+  "name": "routerfarm-dashboard",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Native Windows dashboard for router-controlled Android farm operations",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:desktop": "electron .",
+    "test:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test-routerfarm-smoke.ps1",
+    "dist:desktop": "electron-builder --win portable nsis --x64"
+  },
+  "build": {
+    "appId": "com.routerfarm.desktop",
+    "productName": "RouterFarm",
+    "artifactName": "${productName} ${version}.${ext}",
+    "files": [
+      "assets/**/*",
+      "electron/**/*",
+      "web/**/*",
+      "scripts/**/*",
+      "android/**/*",
+      "config/**/*",
+      "server.js",
+      "package.json",
+      "README.md"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "assets/routerfarm.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "installerIcon": "assets/routerfarm.ico",
+      "uninstallerIcon": "assets/routerfarm.ico",
+      "installerHeaderIcon": "assets/routerfarm.ico",
+      "shortcutName": "RouterFarm",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^24.13.3"
+  }
+}
