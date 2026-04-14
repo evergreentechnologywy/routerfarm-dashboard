@@ -2,7 +2,7 @@ param(
   [string]$SubnetPrefix = "192.168.8",
   [int]$StartHost = 1,
   [int]$EndHost = 254,
-  [string]$RoutersPath = "C:\RouterFarm\config\routers.json",
+  [string]$RoutersPath,
   [switch]$UseArpCache,
   [switch]$WriteConfig,
   [switch]$DisableUndiscovered
@@ -10,6 +10,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
+
+$scriptRoot = Split-Path -Parent $PSCommandPath
+$projectRoot = Split-Path -Parent $scriptRoot
+if (-not $RoutersPath) {
+  $RoutersPath = Join-Path $projectRoot "config\routers.json"
+}
 
 function Test-TcpPort {
   param(

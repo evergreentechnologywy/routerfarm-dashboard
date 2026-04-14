@@ -22,6 +22,7 @@ const state = {
   renderCache: {
     heroGuard: "",
     summaryStats: "",
+    rackOverview: "",
     contextBar: "",
     routers: "",
     queue: "",
@@ -45,6 +46,8 @@ const refreshButton = document.getElementById("refreshButton");
 const routeGuardBadge = document.getElementById("routeGuardBadge");
 const liveClock = document.getElementById("liveClock");
 const statsGrid = document.getElementById("statsGrid");
+const rackOverviewBadge = document.getElementById("rackOverviewBadge");
+const rackOverviewGrid = document.getElementById("rackOverviewGrid");
 const deviceCount = document.getElementById("deviceCount");
 const cardView = document.getElementById("cardView");
 const tableView = document.getElementById("tableView");
@@ -327,6 +330,17 @@ function buildContextSignature(allDevices, visibleDevices, activeSession) {
   ].join("|");
 }
 
+function buildRackOverviewSignature(routers) {
+  return (routers || []).map(router => [
+    router.id,
+    router.routerState?.healthStatus || "",
+    router.routerState?.routerMode || "",
+    router.routerState?.uplinkMode || "",
+    router.routerState?.tetheringState || "",
+    router.activeDeviceSerial || ""
+  ].join("~")).join("|");
+}
+
 function buildRoutersSignature(routers) {
   return routers.map(router => [
     router.id,
@@ -479,6 +493,7 @@ function render() {
   const summaryStats = buildSummaryStats(data.devices || []);
   const heroGuardSignature = `${data.routingGuard?.blocked ? "1" : "0"}|${(data.routingGuard?.reasons || []).join("|")}`;
   const summaryStatsSignature = buildSummaryStatsSignature(summaryStats);
+  const rackOverviewSignature = buildRackOverviewSignature(data.routers || []);
   const contextSignature = buildContextSignature(data.devices || [], visibleDevices, data.activeSession);
   const routersSignature = buildRoutersSignature(data.routers || []);
   const queueSignature = buildQueueSignature(data);
@@ -498,6 +513,10 @@ function render() {
   if (state.renderCache.summaryStats !== summaryStatsSignature) {
     renderSummaryStats(summaryStats);
     state.renderCache.summaryStats = summaryStatsSignature;
+  }
+  if (state.renderCache.rackOverview !== rackOverviewSignature) {
+    renderRackOverview(data.routers || []);
+    state.renderCache.rackOverview = rackOverviewSignature;
   }
   if (state.renderCache.contextBar !== contextSignature) {
     renderContextBar(data.devices || [], visibleDevices);
@@ -588,6 +607,44 @@ function renderSummaryStats(stats) {
     fragment.appendChild(button);
   }
   statsGrid.appendChild(fragment);
+}
+
+function renderRackOverview(routers) {
+  const safeRouters = (routers || []).filter(Boolean);
+  const readyRouters = safeRouters.filter(router => {
+    const state = router.routerState || {};
+    return state.healthStatus === "online" && String(state.routerMode || "").toLowerCase() === "router" && String(state.uplinkMode || "").toLowerCase() === "router-uplink";
+  }).length;
+  const apRouters = safeRouters.filter(router => String(router.routerState?.routerMode || "").toLowerCase() === "ap").length;
+  const missingUplinkRouters = safeRouters.filter(router => String(router.routerState?.tetheringState || "").toLowerCase() === "no-device").length;
+  const unreachableRouters = safeRouters.filter(router => (router.routerState?.healthStatus || "") === "offline" || router.routerState?.lastError).length;
+  const activeRouters = safeRouters.filter(router => router.activeDeviceSerial).length;
+
+  const statusLabel = readyRouters > 0 ? `${readyRouters} routed ready` : "No routed routers";
+  rackOverviewBadge.textContent = statusLabel;
+  rackOverviewBadge.className = `count-pill ${readyRouters > 0 ? "count-pill-success" : "count-pill-warning"}`;
+
+  const items = [
+    { label: "Routed Ready", value: readyRouters, tone: "success", note: "Routers in router mode with a usable uplink path." },
+    { label: "AP Only", value: apRouters, tone: apRouters ? "warning" : "neutral", note: "Reachable Opals still bridged or in access-point mode." },
+    { label: "No USB Uplink", value: missingUplinkRouters, tone: missingUplinkRouters ? "danger" : "neutral", note: "Routers that do not currently detect a LinkPro USB data device." },
+    { label: "Unreachable", value: unreachableRouters, tone: unreachableRouters ? "danger" : "neutral", note: "Routers that failed management checks and need recovery." },
+    { label: "Active Routers", value: activeRouters, tone: activeRouters ? "info" : "neutral", note: "Routers currently tied to an active device session." }
+  ];
+
+  rackOverviewGrid.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  for (const item of items) {
+    const article = document.createElement("article");
+    article.className = `rack-overview-card tone-${item.tone}`;
+    article.innerHTML = `
+      <span class="rack-overview-label">${escapeHtml(item.label)}</span>
+      <strong class="rack-overview-value">${escapeHtml(String(item.value))}</strong>
+      <p class="rack-overview-note">${escapeHtml(item.note)}</p>
+    `;
+    fragment.appendChild(article);
+  }
+  rackOverviewGrid.appendChild(fragment);
 }
 
 function renderContextBar(allDevices, visibleDevices) {

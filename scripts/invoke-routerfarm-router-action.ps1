@@ -178,12 +178,14 @@ if ([string]::IsNullOrWhiteSpace($routerHost)) {
 }
 
 $plinkCommand = Get-Command "plink.exe" -ErrorAction SilentlyContinue
-$routerHostKey = if ($router.sshHostKey) {
-  [string]$router.sshHostKey
-} elseif ($settings.routerControl.defaultHostKeys -and ($settings.routerControl.defaultHostKeys.PSObject.Properties.Name -contains $routerHost)) {
-  [string]$settings.routerControl.defaultHostKeys.$routerHost
-} else {
-  ""
+$routerHostKey = ""
+if ($router.sshHostKey) {
+  $routerHostKey = [string]$router.sshHostKey
+} elseif ($settings.routerControl.defaultHostKeys) {
+  $hostKeyProperty = $settings.routerControl.defaultHostKeys.PSObject.Properties[$routerHost]
+  if ($hostKeyProperty) {
+    $routerHostKey = [string]$hostKeyProperty.Value
+  }
 }
 $usePlink = [bool]($routerPassword -and $plinkCommand -and $routerHostKey)
 if ($usePlink) {
@@ -356,6 +358,16 @@ if ($Action -eq "router-health") {
     $uplinkInterface = "lan"
     $uplinkMode = "bridge-or-ap"
     $uplinkRaw = $routeResult.Output
+  }
+
+  if ($routerMode -notin @("ap", "router")) {
+    if ($tetheringState -eq "detected" -or $uplinkMode -eq "router-uplink") {
+      $routerMode = "router"
+    } elseif ($uplinkMode -eq "bridge-or-ap") {
+      $routerMode = "ap"
+    } else {
+      $routerMode = ""
+    }
   }
 
   Write-Result -Success:$true -Message "Router health probe completed." -Extra @{

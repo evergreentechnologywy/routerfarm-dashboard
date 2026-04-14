@@ -267,6 +267,16 @@ h2 {
   letter-spacing: -0.01em;
 }
 
+.count-pill-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.count-pill-warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
 .build-chip,
 .count-pill,
 .user-pill,
@@ -309,6 +319,77 @@ h2 {
   grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.rack-overview-panel {
+  margin-bottom: 14px;
+}
+
+.rack-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.rack-overview-card {
+  display: grid;
+  gap: 10px;
+  min-height: 132px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 249, 244, 0.92)),
+    var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.rack-overview-card.tone-success {
+  border-color: rgba(29, 122, 71, 0.18);
+  background:
+    linear-gradient(180deg, rgba(232, 247, 239, 0.98), rgba(255, 255, 255, 0.94)),
+    var(--surface);
+}
+
+.rack-overview-card.tone-warning {
+  border-color: rgba(154, 103, 0, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 244, 214, 0.98), rgba(255, 255, 255, 0.94)),
+    var(--surface);
+}
+
+.rack-overview-card.tone-danger {
+  border-color: rgba(180, 35, 24, 0.18);
+  background:
+    linear-gradient(180deg, rgba(253, 236, 236, 0.98), rgba(255, 255, 255, 0.94)),
+    var(--surface);
+}
+
+.rack-overview-card.tone-info {
+  border-color: rgba(13, 107, 87, 0.18);
+  background:
+    linear-gradient(180deg, rgba(230, 245, 241, 0.98), rgba(255, 255, 255, 0.94)),
+    var(--surface);
+}
+
+.rack-overview-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  font-weight: 700;
+}
+
+.rack-overview-value {
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+  color: var(--heading);
+}
+
+.rack-overview-note {
+  color: var(--text-muted);
+  line-height: 1.45;
 }
 
 .stat-card {
