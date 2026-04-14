@@ -6,7 +6,10 @@
     <title>RouterFarm Desktop v20260414a</title>
     <script>
       (function setRouterFarmBasePath() {
-        const baseHref = window.location.pathname.startsWith("/routerfarm") ? "/routerfarm/" : "/";
+        const isFileProtocol = window.location.protocol === "file:";
+        const baseHref = isFileProtocol
+          ? "./"
+          : (window.location.pathname.startsWith("/routerfarm") ? "/routerfarm/" : "/");
         const base = document.createElement("base");
         base.href = baseHref;
         document.head.appendChild(base);
