@@ -1,6 +1,7 @@
 param(
   [string]$ExePath,
-  [string]$ShortcutName = "RouterFarm"
+  [string]$ShortcutName = "RouterFarm",
+  [switch]$Desktop
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,20 +22,29 @@ if (-not (Test-Path -LiteralPath $ExePath)) {
 }
 
 $startMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\RouterFarm"
-$shortcutPath = Join-Path $startMenuDir "$ShortcutName.lnk"
+$desktopDir = [Environment]::GetFolderPath("Desktop")
+$shortcutTargets = @(
+  (Join-Path $startMenuDir "$ShortcutName.lnk")
+)
+
+if ($Desktop) {
+  $shortcutTargets += (Join-Path $desktopDir "$ShortcutName.lnk")
+}
 
 New-Item -ItemType Directory -Path $startMenuDir -Force | Out-Null
 
 $shell = New-Object -ComObject WScript.Shell
-$shortcut = $shell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = $ExePath
-$shortcut.WorkingDirectory = Split-Path -Parent $ExePath
-$shortcut.IconLocation = "$ExePath,0"
-$shortcut.Description = "RouterFarm desktop app"
-$shortcut.Save()
+foreach ($shortcutPath in $shortcutTargets) {
+  $shortcut = $shell.CreateShortcut($shortcutPath)
+  $shortcut.TargetPath = $ExePath
+  $shortcut.WorkingDirectory = Split-Path -Parent $ExePath
+  $shortcut.IconLocation = "$ExePath,0"
+  $shortcut.Description = "RouterFarm desktop app"
+  $shortcut.Save()
+}
 
 [pscustomobject]@{
   ok = $true
-  shortcutPath = $shortcutPath
+  shortcutPaths = $shortcutTargets
   exePath = $ExePath
 } | ConvertTo-Json -Compress

@@ -1322,6 +1322,10 @@ h2 {
   word-break: break-word;
 }
 
+.meta-cell-secondary {
+  display: none;
+}
+
 .device-state-strip {
   display: grid;
   gap: 8px;
@@ -1349,11 +1353,21 @@ h2 {
   font-weight: 700;
 }
 
+.state-pill-secondary {
+  display: none;
+}
+
 
 .device-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.device-actions .action-airplane,
+.device-actions .action-recover,
+.device-actions .action-stop {
+  display: none;
 }
 
 .device-actions .button {
@@ -1624,6 +1638,11 @@ h2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .meta-cell-secondary,
+  .state-pill-secondary {
+    display: grid;
+  }
+
   .dashboard-layout {
     grid-template-columns: 1fr;
   }
@@ -1702,6 +1721,17 @@ h2 {
   .device-actions,
   .device-meta-grid {
     grid-template-columns: 1fr;
+  }
+
+  .device-actions .action-airplane,
+  .device-actions .action-recover,
+  .device-actions .action-stop {
+    display: inline-flex;
+  }
+
+  .meta-cell-secondary,
+  .state-pill-secondary {
+    display: grid;
   }
 
   .panel,
