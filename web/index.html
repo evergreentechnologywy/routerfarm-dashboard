@@ -21,139 +21,170 @@
       <div class="backdrop-grid"></div>
     </div>
     <div id="appShell" class="shell">
-      <header class="hero hero-topbar">
-        <div class="hero-copy">
-          <p class="eyebrow">Native Desktop Control Room</p>
-          <div class="brand-row">
-            <h1>RouterFarm</h1>
-            <span class="build-chip">Build 20260414a</span>
+      <div class="app-frame">
+        <aside class="shell-nav">
+          <div class="nav-brand">
+            <div class="nav-brand-mark">RF</div>
+            <div>
+              <p class="eyebrow">Router Stack</p>
+              <strong>RouterFarm</strong>
+            </div>
           </div>
-          <p class="subtitle">Desktop-native orchestration for routed Opals, USB-backed LinkPro uplinks, and session gating that rejects reused IPs, AP mode, or missing tethering before a phone is allowed to run.</p>
-          <div class="hero-status-row">
-            <span id="routeGuardBadge" class="badge badge-neutral">Checking routing</span>
-            <span id="liveClock" class="count-pill">--</span>
-          </div>
-          <p id="heroNarrative" class="hero-narrative">Collecting rack telemetry and summarizing the next operator move.</p>
-        </div>
-        <div class="hero-side">
-          <div class="hero-actions">
-            <div class="user-pill" id="currentUser"></div>
-            <button id="refreshButton" class="button button-secondary" type="button">Refresh</button>
-            <button id="logoutButton" class="button button-ghost" type="button">Logout</button>
-          </div>
-          <div class="hero-insight-grid">
-            <article class="hero-insight hero-insight-primary">
-              <span class="hero-insight-label">Routed Ready</span>
-              <strong id="heroPrimaryValue" class="hero-insight-value">0</strong>
-              <p id="heroPrimaryNote" class="hero-insight-note">Waiting for router health.</p>
-            </article>
-            <article class="hero-insight">
-              <span class="hero-insight-label">Session Blocks</span>
-              <strong id="heroSecondaryValue" class="hero-insight-value">0</strong>
-              <p id="heroSecondaryNote" class="hero-insight-note">No blocked devices yet.</p>
-            </article>
-            <article class="hero-insight">
-              <span class="hero-insight-label">Active Prep</span>
-              <strong id="heroTertiaryValue" class="hero-insight-value">Idle</strong>
-              <p id="heroTertiaryNote" class="hero-insight-note">No active prep worker.</p>
-            </article>
-          </div>
-        </div>
-      </header>
-
-      <section class="stats-grid" id="statsGrid"></section>
-
-      <section class="panel rack-overview-panel">
-        <div class="panel-header">
-          <div>
-            <h2>Rack Overview</h2>
-            <p class="panel-copy">Live router readiness for the whole rack, with routed units separated from AP-only or unreachable units before operators start sessions.</p>
-          </div>
-          <span id="rackOverviewBadge" class="count-pill">Auditing rack</span>
-        </div>
-        <div id="rackOverviewGrid" class="rack-overview-grid"></div>
-      </section>
-
-      <section class="toolbar panel">
-        <div class="toolbar-left">
-          <label class="search-field">
-            <span class="field-label">Search</span>
-            <input id="searchInput" type="search" placeholder="Search phone, serial, Gmail, or number" />
-          </label>
-          <label class="select-field">
-            <span class="field-label">Status</span>
-            <select id="statusFilter">
-              <option value="all">All statuses</option>
-              <option value="online">Online</option>
-              <option value="offline">Offline</option>
-              <option value="idle">Idle</option>
-              <option value="queued">Queued</option>
-              <option value="preparing">Preparing</option>
-              <option value="ready">Ready</option>
-              <option value="failed">Failed</option>
-            </select>
-          </label>
-          <label class="select-field">
-            <span class="field-label">Role</span>
-            <select id="roleFilter">
-              <option value="all">All roles</option>
-              <option value="sim-direct">SIM Direct</option>
-              <option value="opal-client">Opal Client</option>
-              <option value="hotspot-client">Hotspot Client</option>
-            </select>
-          </label>
-        </div>
-        <div class="toolbar-right">
-          <label class="toggle-chip">
-            <input id="warningsOnlyToggle" type="checkbox" />
-            <span>Warnings Only</span>
-          </label>
-          <label class="toggle-chip">
-            <input id="readyOnlyToggle" type="checkbox" />
-            <span>Ready Only</span>
-          </label>
-          <div class="view-toggle" role="tablist" aria-label="View mode">
-            <button id="cardViewButton" class="view-toggle-button is-active" type="button">Card View</button>
-            <button id="tableViewButton" class="view-toggle-button" type="button">Table View</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="context-bar panel mission-bar">
-        <div class="context-copy">
-          <p class="context-label">Mission Context</p>
-          <strong id="contextSummary">Loading dashboard state</strong>
-        </div>
-        <div id="contextChips" class="context-chips"></div>
-      </section>
-
-      <section class="quick-actions panel">
-        <div class="quick-actions-copy">
-          <p class="context-label">Quick Actions</p>
-          <strong>Fast operator controls for filtering, focusing, and switching views without losing rack context.</strong>
-        </div>
-        <div class="quick-actions-row">
-          <button id="showAllButton" class="button button-secondary quick-action-button" type="button">Show All</button>
-          <button id="showReadyButton" class="button button-secondary quick-action-button" type="button">Ready</button>
-          <button id="showWarningsButton" class="button button-secondary quick-action-button" type="button">Warnings</button>
-          <button id="toggleViewButton" class="button button-secondary quick-action-button" type="button">Toggle View</button>
-          <button id="focusSearchButton" class="button button-secondary quick-action-button" type="button">Focus Search</button>
-        </div>
-      </section>
-
-      <section class="panel router-panel">
-        <div class="panel-header">
-              <div>
-                <h2>Opal Routers</h2>
-                <p class="panel-copy">Each router exposes live health, USB uplink detection, and topology readiness before RouterFarm allows a phone session to start.</p>
+          <div class="nav-stack">
+            <div class="nav-card nav-card-primary">
+              <span class="nav-label">Live Build</span>
+              <strong>20260414a</strong>
+              <p>Desktop-native routing, prep, and IP controls.</p>
+            </div>
+            <div class="nav-card">
+              <span class="nav-label">Sections</span>
+              <div class="nav-pills">
+                <span class="nav-pill is-active">Overview</span>
+                <span class="nav-pill">Devices</span>
+                <span class="nav-pill">Routers</span>
+                <span class="nav-pill">Safety</span>
               </div>
-          <span id="routerCount" class="count-pill">0 routers</span>
-        </div>
-        <div id="routerGrid" class="router-grid"></div>
-      </section>
+            </div>
+            <div class="nav-card">
+              <span class="nav-label">Operator</span>
+              <strong id="currentUser"></strong>
+              <div class="nav-actions">
+                <button id="refreshButton" class="button button-secondary" type="button">Refresh</button>
+                <button id="logoutButton" class="button button-ghost" type="button">Logout</button>
+              </div>
+            </div>
+          </div>
+        </aside>
 
-      <main class="dashboard-layout">
-        <section class="main-column">
+        <main class="shell-main">
+          <header class="hero hero-topbar">
+            <div class="hero-copy">
+              <p class="eyebrow">Native Desktop Control Room</p>
+              <div class="brand-row">
+                <h1>RouterFarm</h1>
+                <span class="build-chip">Build 20260414a</span>
+              </div>
+              <p class="subtitle">Desktop-native orchestration for routed Opals, USB-backed LinkPro uplinks, and session gating that rejects reused IPs, AP mode, or missing tethering before a phone is allowed to run.</p>
+              <div class="hero-status-row">
+                <span id="routeGuardBadge" class="badge badge-neutral">Checking routing</span>
+                <span id="liveClock" class="count-pill">--</span>
+              </div>
+              <p id="heroNarrative" class="hero-narrative">Collecting rack telemetry and summarizing the next operator move.</p>
+            </div>
+            <div class="hero-side">
+              <div class="hero-insight-grid">
+                <article class="hero-insight hero-insight-primary">
+                  <span class="hero-insight-label">Routed Ready</span>
+                  <strong id="heroPrimaryValue" class="hero-insight-value">0</strong>
+                  <p id="heroPrimaryNote" class="hero-insight-note">Waiting for router health.</p>
+                </article>
+                <article class="hero-insight">
+                  <span class="hero-insight-label">Session Blocks</span>
+                  <strong id="heroSecondaryValue" class="hero-insight-value">0</strong>
+                  <p id="heroSecondaryNote" class="hero-insight-note">No blocked devices yet.</p>
+                </article>
+                <article class="hero-insight">
+                  <span class="hero-insight-label">Active Prep</span>
+                  <strong id="heroTertiaryValue" class="hero-insight-value">Idle</strong>
+                  <p id="heroTertiaryNote" class="hero-insight-note">No active prep worker.</p>
+                </article>
+              </div>
+            </div>
+          </header>
+
+          <section class="stats-grid" id="statsGrid"></section>
+
+          <section class="context-bar panel mission-bar">
+            <div class="context-copy">
+              <p class="context-label">Mission Context</p>
+              <strong id="contextSummary">Loading dashboard state</strong>
+            </div>
+            <div id="contextChips" class="context-chips"></div>
+          </section>
+
+          <section class="toolbar panel">
+            <div class="toolbar-left">
+              <label class="search-field">
+                <span class="field-label">Search</span>
+                <input id="searchInput" type="search" placeholder="Search phone, serial, Gmail, or number" />
+              </label>
+              <label class="select-field">
+                <span class="field-label">Status</span>
+                <select id="statusFilter">
+                  <option value="all">All statuses</option>
+                  <option value="online">Online</option>
+                  <option value="offline">Offline</option>
+                  <option value="idle">Idle</option>
+                  <option value="queued">Queued</option>
+                  <option value="preparing">Preparing</option>
+                  <option value="ready">Ready</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </label>
+              <label class="select-field">
+                <span class="field-label">Role</span>
+                <select id="roleFilter">
+                  <option value="all">All roles</option>
+                  <option value="sim-direct">SIM Direct</option>
+                  <option value="opal-client">Opal Client</option>
+                  <option value="hotspot-client">Hotspot Client</option>
+                </select>
+              </label>
+            </div>
+            <div class="toolbar-right">
+              <label class="toggle-chip">
+                <input id="warningsOnlyToggle" type="checkbox" />
+                <span>Warnings Only</span>
+              </label>
+              <label class="toggle-chip">
+                <input id="readyOnlyToggle" type="checkbox" />
+                <span>Ready Only</span>
+              </label>
+              <div class="view-toggle" role="tablist" aria-label="View mode">
+                <button id="cardViewButton" class="view-toggle-button is-active" type="button">Card View</button>
+                <button id="tableViewButton" class="view-toggle-button" type="button">Table View</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="quick-actions panel">
+            <div class="quick-actions-copy">
+              <p class="context-label">Quick Actions</p>
+              <strong>Fast operator controls for filtering, focusing, and switching views without losing rack context.</strong>
+            </div>
+            <div class="quick-actions-row">
+              <button id="showAllButton" class="button button-secondary quick-action-button" type="button">Show All</button>
+              <button id="showReadyButton" class="button button-secondary quick-action-button" type="button">Ready</button>
+              <button id="showWarningsButton" class="button button-secondary quick-action-button" type="button">Warnings</button>
+              <button id="toggleViewButton" class="button button-secondary quick-action-button" type="button">Toggle View</button>
+              <button id="focusSearchButton" class="button button-secondary quick-action-button" type="button">Focus Search</button>
+            </div>
+          </section>
+
+          <main class="dashboard-layout">
+            <section class="main-column">
+              <section class="panel rack-overview-panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Rack Overview</h2>
+                    <p class="panel-copy">Live router readiness for the whole rack, with routed units separated from AP-only or unreachable units before operators start sessions.</p>
+                  </div>
+                  <span id="rackOverviewBadge" class="count-pill">Auditing rack</span>
+                </div>
+                <div id="rackOverviewGrid" class="rack-overview-grid"></div>
+              </section>
+
+              <section class="panel router-panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Opal Routers</h2>
+                    <p class="panel-copy">Each router exposes live health, USB uplink detection, and topology readiness before RouterFarm allows a phone session to start.</p>
+                  </div>
+                  <span id="routerCount" class="count-pill">0 routers</span>
+                </div>
+                <div id="routerGrid" class="router-grid"></div>
+              </section>
+
           <section class="panel devices-panel">
             <div class="panel-header">
               <div>
@@ -188,59 +219,61 @@
               </table>
             </div>
           </section>
-        </section>
+            </section>
 
-        <aside class="side-column">
-          <section class="panel queue-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Queue</h2>
-                <p class="panel-copy">Global prep flow with live elapsed timing for the active worker.</p>
-              </div>
-              <span id="queueLengthBadge" class="count-pill">0 queued</span>
-            </div>
-            <div class="queue-overview">
-              <div class="queue-overview-card">
-                <span>Active Prep</span>
-                <strong id="activePrepDevice">Idle</strong>
-                <small id="activePrepCountdown">No active countdown</small>
-                <div class="queue-progress" aria-hidden="true">
-                  <div id="activePrepProgressBar" class="queue-progress-bar"></div>
+            <aside class="side-column">
+              <section class="panel queue-panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Queue</h2>
+                    <p class="panel-copy">Global prep flow with live elapsed timing for the active worker.</p>
+                  </div>
+                  <span id="queueLengthBadge" class="count-pill">0 queued</span>
                 </div>
-              </div>
-              <div class="queue-overview-card">
-                <span>Last Completed</span>
-                <strong id="lastCompletedPrep">No completed prep yet</strong>
-                <small id="lastCompletedPrepMeta">Waiting for first completion</small>
-              </div>
-            </div>
-            <div id="queueList" class="queue-list"></div>
-          </section>
+                <div class="queue-overview">
+                  <div class="queue-overview-card">
+                    <span>Active Prep</span>
+                    <strong id="activePrepDevice">Idle</strong>
+                    <small id="activePrepCountdown">No active countdown</small>
+                    <div class="queue-progress" aria-hidden="true">
+                      <div id="activePrepProgressBar" class="queue-progress-bar"></div>
+                    </div>
+                  </div>
+                  <div class="queue-overview-card">
+                    <span>Last Completed</span>
+                    <strong id="lastCompletedPrep">No completed prep yet</strong>
+                    <small id="lastCompletedPrepMeta">Waiting for first completion</small>
+                  </div>
+                </div>
+                <div id="queueList" class="queue-list"></div>
+              </section>
 
-          <section class="panel activity-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Activity</h2>
-                <p class="panel-copy">Recent actions and warnings affecting operator workflow.</p>
-              </div>
-            </div>
-            <div id="activityList" class="activity-list"></div>
-          </section>
+              <section class="panel activity-panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Activity</h2>
+                    <p class="panel-copy">Recent actions and warnings affecting operator workflow.</p>
+                  </div>
+                </div>
+                <div id="activityList" class="activity-list"></div>
+              </section>
 
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Routing Safety</h2>
-                <p class="panel-copy">Checks to confirm remote dashboard access stays separate from phone traffic, with hard blocks when the PC is acting like a gateway or proxy.</p>
-              </div>
-              <span id="routingStatusBadge" class="badge badge-neutral">Checking</span>
-            </div>
-            <p id="routingSummary" class="panel-copy panel-copy-tight"></p>
-            <div id="routingPaths" class="routing-paths"></div>
-            <div id="routingChecks" class="activity-list"></div>
-          </section>
-        </aside>
-      </main>
+              <section class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Routing Safety</h2>
+                    <p class="panel-copy">Checks to confirm remote dashboard access stays separate from phone traffic, with hard blocks when the PC is acting like a gateway or proxy.</p>
+                  </div>
+                  <span id="routingStatusBadge" class="badge badge-neutral">Checking</span>
+                </div>
+                <p id="routingSummary" class="panel-copy panel-copy-tight"></p>
+                <div id="routingPaths" class="routing-paths"></div>
+                <div id="routingChecks" class="activity-list"></div>
+              </section>
+            </aside>
+          </main>
+        </main>
+      </div>
     </div>
 
     <template id="deviceCardTemplate">

@@ -141,6 +141,126 @@ select {
   padding: 24px 26px 40px;
 }
 
+.app-frame {
+  display: grid;
+  grid-template-columns: 276px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.shell-nav {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 28px;
+  border: 1px solid var(--border);
+  background: rgba(9, 12, 18, 0.9);
+  box-shadow: var(--shadow-lg);
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.nav-brand strong {
+  display: block;
+  color: #fff;
+  font-size: 1.1rem;
+  letter-spacing: -0.03em;
+}
+
+.nav-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ff8a57, #e05a28);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  box-shadow: 0 14px 28px rgba(255, 122, 69, 0.3);
+}
+
+.nav-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.nav-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.nav-card-primary {
+  background:
+    radial-gradient(circle at top right, rgba(52, 211, 153, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(31, 41, 55, 0.96), rgba(17, 24, 39, 0.96));
+}
+
+.nav-card strong,
+.nav-card p,
+.nav-label,
+.nav-pill {
+  color: #fff;
+}
+
+.nav-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.68);
+  line-height: 1.45;
+}
+
+.nav-label {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 800;
+}
+
+.nav-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nav-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.nav-pill.is-active {
+  background: linear-gradient(180deg, #ff8a57, #e05a28);
+  color: #fff;
+}
+
+.nav-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.shell-main {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
 h1,
 h2,
 h3,
@@ -1485,6 +1605,14 @@ h2 {
 }
 
 @media (max-width: 1240px) {
+  .app-frame {
+    grid-template-columns: 1fr;
+  }
+
+  .shell-nav {
+    position: static;
+  }
+
   .stats-grid,
   .rack-overview-grid,
   .router-grid,
@@ -1512,6 +1640,10 @@ h2 {
 @media (max-width: 980px) {
   .shell {
     padding: 18px;
+  }
+
+  .app-frame {
+    gap: 16px;
   }
 
   .hero-topbar,
