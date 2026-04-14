@@ -3,7 +3,8 @@ param(
   [string]$StatusUrl = "http://127.0.0.1:7781/api/status",
   [int]$PollSeconds = 20,
   [int]$StartWaitSeconds = 12,
-  [string]$LogPath = "C:\Users\everg\routerfarm-release\logs\watch-routerfarm.log"
+  [string]$LogPath = "C:\Users\everg\routerfarm-release\logs\watch-routerfarm.log",
+  [string]$MaintenanceLockPath = "C:\Users\everg\routerfarm-release\logs\watch-routerfarm.maintenance.lock"
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +31,10 @@ function Stop-RouterFarmProcesses {
   Get-Process RouterFarm -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
+function Test-MaintenanceMode {
+  return Test-Path -LiteralPath $MaintenanceLockPath
+}
+
 function Start-RouterFarm {
   if (-not (Test-Path -LiteralPath $ExePath)) {
     throw "RouterFarm executable not found at $ExePath"
@@ -42,6 +47,12 @@ Write-WatchLog "Watchdog started. Monitoring $StatusUrl"
 
 while ($true) {
   try {
+    if (Test-MaintenanceMode) {
+      Write-WatchLog "Maintenance lock detected. Skipping recovery checks."
+      Start-Sleep -Seconds $PollSeconds
+      continue
+    }
+
     $running = @(Get-Process RouterFarm -ErrorAction SilentlyContinue).Count -gt 0
     $healthy = Test-RouterFarmHealthy
 
