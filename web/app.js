@@ -21,6 +21,7 @@ const state = {
   },
   renderCache: {
     heroGuard: "",
+    heroInsights: "",
     summaryStats: "",
     rackOverview: "",
     contextBar: "",
@@ -45,6 +46,13 @@ const logoutButton = document.getElementById("logoutButton");
 const refreshButton = document.getElementById("refreshButton");
 const routeGuardBadge = document.getElementById("routeGuardBadge");
 const liveClock = document.getElementById("liveClock");
+const heroNarrative = document.getElementById("heroNarrative");
+const heroPrimaryValue = document.getElementById("heroPrimaryValue");
+const heroPrimaryNote = document.getElementById("heroPrimaryNote");
+const heroSecondaryValue = document.getElementById("heroSecondaryValue");
+const heroSecondaryNote = document.getElementById("heroSecondaryNote");
+const heroTertiaryValue = document.getElementById("heroTertiaryValue");
+const heroTertiaryNote = document.getElementById("heroTertiaryNote");
 const statsGrid = document.getElementById("statsGrid");
 const rackOverviewBadge = document.getElementById("rackOverviewBadge");
 const rackOverviewGrid = document.getElementById("rackOverviewGrid");
@@ -315,6 +323,25 @@ function buildSummaryStatsSignature(stats) {
   return stats.map(stat => `${stat.label}:${stat.value}:${stat.tone}`).join("|");
 }
 
+function buildHeroInsightsSignature(data, visibleDevices) {
+  const routers = data?.routers || [];
+  const prepActive = data?.prepTelemetry?.active || null;
+  const readyRouters = routers.filter(router => {
+    const routerState = router.routerState || {};
+    return routerState.healthStatus === "online"
+      && String(routerState.routerMode || "").toLowerCase() === "router"
+      && String(routerState.uplinkMode || "").toLowerCase() === "router-uplink";
+  }).length;
+  const blockedDevices = (visibleDevices || []).filter(device => shouldDisableAction(device, "start-session")).length;
+  return [
+    data?.routingGuard?.blocked ? "1" : "0",
+    readyRouters,
+    blockedDevices,
+    prepActive?.serial || "",
+    prepActive?.elapsedMs || 0
+  ].join("|");
+}
+
 function buildContextSignature(allDevices, visibleDevices, activeSession) {
   return [
     state.viewMode,
@@ -492,6 +519,7 @@ function render() {
   const visibleDevices = filterDevices(data.devices || []);
   const summaryStats = buildSummaryStats(data.devices || []);
   const heroGuardSignature = `${data.routingGuard?.blocked ? "1" : "0"}|${(data.routingGuard?.reasons || []).join("|")}`;
+  const heroInsightsSignature = buildHeroInsightsSignature(data, visibleDevices);
   const summaryStatsSignature = buildSummaryStatsSignature(summaryStats);
   const rackOverviewSignature = buildRackOverviewSignature(data.routers || []);
   const contextSignature = buildContextSignature(data.devices || [], visibleDevices, data.activeSession);
@@ -509,6 +537,10 @@ function render() {
   if (state.renderCache.heroGuard !== heroGuardSignature) {
     renderHeroGuard(data.routingGuard || {});
     state.renderCache.heroGuard = heroGuardSignature;
+  }
+  if (state.renderCache.heroInsights !== heroInsightsSignature) {
+    renderHeroInsights(data, visibleDevices);
+    state.renderCache.heroInsights = heroInsightsSignature;
   }
   if (state.renderCache.summaryStats !== summaryStatsSignature) {
     renderSummaryStats(summaryStats);
@@ -575,11 +607,58 @@ function renderHeroGuard(routingGuard) {
   setClassIfChanged(routeGuardBadge, `badge ${blocked ? "badge-failed" : "badge-ready"}`);
 }
 
+function renderHeroInsights(data, visibleDevices) {
+  const routers = data?.routers || [];
+  const readyRouters = routers.filter(router => {
+    const routerState = router.routerState || {};
+    return routerState.healthStatus === "online"
+      && String(routerState.routerMode || "").toLowerCase() === "router"
+      && String(routerState.uplinkMode || "").toLowerCase() === "router-uplink";
+  });
+  const blockedDevices = (visibleDevices || []).filter(device => shouldDisableAction(device, "start-session"));
+  const prepActive = data?.prepTelemetry?.active || null;
+  const noUplinkRouters = routers.filter(router => String(router.routerState?.tetheringState || "").toLowerCase() === "no-device").length;
+  const apRouters = routers.filter(router => String(router.routerState?.routerMode || "").toLowerCase() === "ap").length;
+
+  setTextIfChanged(heroPrimaryValue, `${readyRouters.length}/${routers.length || 0}`);
+  setTextIfChanged(
+    heroPrimaryNote,
+    readyRouters.length
+      ? "Routed Opals with a healthy uplink and a session-safe path."
+      : "No Opals are fully session-ready yet. Promote one working router template first."
+  );
+
+  setTextIfChanged(heroSecondaryValue, String(blockedDevices.length));
+  setTextIfChanged(
+    heroSecondaryNote,
+    blockedDevices.length
+      ? "Visible phones blocked by routing, IP, or activation policy."
+      : "Visible phones are currently clear of session policy blockers."
+  );
+
+  setTextIfChanged(heroTertiaryValue, prepActive ? formatDeviceName(getDeviceBySerial(prepActive.serial) || prepActive) : "Idle");
+  setTextIfChanged(
+    heroTertiaryNote,
+    prepActive
+      ? `Prep active for ${formatDuration(prepActive.elapsedMs || 0)} on ${prepActive.serial}.`
+      : "No active prep worker is running."
+  );
+
+  const narrative = data?.routingGuard?.blocked
+    ? "Desktop routing safety is blocking prep. Resolve the host path before launching phones."
+    : readyRouters.length === 0
+      ? `Rack is reachable but not session-ready. ${apRouters} router(s) remain in AP mode and ${noUplinkRouters} report no USB uplink device.`
+      : blockedDevices.length > 0
+        ? `${blockedDevices.length} phone(s) still need clearance before launch. Prioritize duplicate IP and activation lock issues.`
+        : "Rack is in a clean operator state. Filter by ready devices and launch controlled sessions.";
+  setTextIfChanged(heroNarrative, narrative);
+}
+
 function buildSummaryStats(devices) {
   const routers = state.data?.routers || [];
   return [
-    { label: "Total Devices", value: devices.length, tone: "neutral", onClick: () => clearQuickFilters() },
-    { label: "Routers", value: routers.length, tone: "neutral", onClick: () => focusSearch() },
+    { label: "Fleet", value: devices.length, tone: "neutral", onClick: () => clearQuickFilters() },
+    { label: "Router Pool", value: routers.length, tone: "neutral", onClick: () => focusSearch() },
     { label: "Online", value: devices.filter(device => device.online).length, tone: "success", onClick: () => applyQuickFilter({ status: "online" }) },
     { label: "Queued", value: devices.filter(device => device.prepState === "queued").length, tone: "warning", onClick: () => applyQuickFilter({ status: "queued" }) },
     { label: "Preparing", value: devices.filter(device => device.prepState === "preparing").length, tone: "info", onClick: () => applyQuickFilter({ status: "preparing" }) },

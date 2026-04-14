@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RouterFarm Desktop v20260406a</title>
+    <title>RouterFarm Desktop v20260414a</title>
     <script>
       (function setRouterFarmBasePath() {
         const baseHref = window.location.pathname.startsWith("/routerfarm") ? "/routerfarm/" : "/";
@@ -12,7 +12,7 @@
         document.head.appendChild(base);
       })();
     </script>
-    <link rel="stylesheet" href="styles.css?v=20260406a" />
+    <link rel="stylesheet" href="styles.css?v=20260414a" />
   </head>
   <body>
     <div class="shell-backdrop" aria-hidden="true">
@@ -26,18 +26,38 @@
           <p class="eyebrow">Native Desktop Control Room</p>
           <div class="brand-row">
             <h1>RouterFarm</h1>
-            <span class="build-chip">Build 20260406a</span>
+            <span class="build-chip">Build 20260414a</span>
           </div>
-          <p class="subtitle">Desktop-native rack control for 15 Opals, LinkPro-backed uplinks, and session gating that refuses reused IPs, AP mode, or missing USB uplink devices.</p>
+          <p class="subtitle">Desktop-native orchestration for routed Opals, USB-backed LinkPro uplinks, and session gating that rejects reused IPs, AP mode, or missing tethering before a phone is allowed to run.</p>
           <div class="hero-status-row">
             <span id="routeGuardBadge" class="badge badge-neutral">Checking routing</span>
             <span id="liveClock" class="count-pill">--</span>
           </div>
+          <p id="heroNarrative" class="hero-narrative">Collecting rack telemetry and summarizing the next operator move.</p>
         </div>
-        <div class="hero-actions">
-          <div class="user-pill" id="currentUser"></div>
-          <button id="refreshButton" class="button button-secondary" type="button">Refresh</button>
-          <button id="logoutButton" class="button button-ghost" type="button">Logout</button>
+        <div class="hero-side">
+          <div class="hero-actions">
+            <div class="user-pill" id="currentUser"></div>
+            <button id="refreshButton" class="button button-secondary" type="button">Refresh</button>
+            <button id="logoutButton" class="button button-ghost" type="button">Logout</button>
+          </div>
+          <div class="hero-insight-grid">
+            <article class="hero-insight hero-insight-primary">
+              <span class="hero-insight-label">Routed Ready</span>
+              <strong id="heroPrimaryValue" class="hero-insight-value">0</strong>
+              <p id="heroPrimaryNote" class="hero-insight-note">Waiting for router health.</p>
+            </article>
+            <article class="hero-insight">
+              <span class="hero-insight-label">Session Blocks</span>
+              <strong id="heroSecondaryValue" class="hero-insight-value">0</strong>
+              <p id="heroSecondaryNote" class="hero-insight-note">No blocked devices yet.</p>
+            </article>
+            <article class="hero-insight">
+              <span class="hero-insight-label">Active Prep</span>
+              <strong id="heroTertiaryValue" class="hero-insight-value">Idle</strong>
+              <p id="heroTertiaryNote" class="hero-insight-note">No active prep worker.</p>
+            </article>
+          </div>
         </div>
       </header>
 
@@ -99,9 +119,9 @@
         </div>
       </section>
 
-      <section class="context-bar panel">
+      <section class="context-bar panel mission-bar">
         <div class="context-copy">
-          <p class="context-label">Workspace Context</p>
+          <p class="context-label">Mission Context</p>
           <strong id="contextSummary">Loading dashboard state</strong>
         </div>
         <div id="contextChips" class="context-chips"></div>
@@ -364,6 +384,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=20260406a"></script>
+    <script src="app.js?v=20260414a"></script>
   </body>
 </html>
