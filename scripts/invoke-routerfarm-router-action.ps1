@@ -48,6 +48,38 @@ function Invoke-SshCommand {
     [string]$StdinPath
   )
 
+  if ($usePlink) {
+    $plinkArgs = @(
+      "-ssh",
+      "-batch",
+      "-pw", $routerPassword,
+      "-hostkey", $routerHostKey,
+      "-P", "$sshPort",
+      "$username@$routerHost"
+    )
+    if ($Command) {
+      $plinkArgs += $Command
+    }
+
+    try {
+      $result = if ($StdinPath) {
+        Get-Content -LiteralPath $StdinPath | & $sshPath @plinkArgs 2>&1
+      } else {
+        & $sshPath @plinkArgs 2>&1
+      }
+      $exitCode = $LASTEXITCODE
+      return [pscustomobject]@{
+        ExitCode = $exitCode
+        Output = [string]($result | Out-String).Trim()
+      }
+    } catch {
+      return [pscustomobject]@{
+        ExitCode = 1
+        Output = $_.Exception.Message
+      }
+    }
+  }
+
   $sshArgs = @(
     "-o", "StrictHostKeyChecking=no",
     "-o", "BatchMode=yes",
@@ -130,6 +162,14 @@ $sshPath = if ($settings.routerControl.sshPath) { [string]$settings.routerContro
 $username = if ($router.adminUsername) { [string]$router.adminUsername } elseif ($settings.routerControl.defaultUsername) { [string]$settings.routerControl.defaultUsername } else { "root" }
 $sshPort = if ($router.sshPort) { [int]$router.sshPort } elseif ($settings.routerControl.defaultPort) { [int]$settings.routerControl.defaultPort } else { 22 }
 $commandTimeout = if ($settings.routerControl.commandTimeoutSeconds) { [int]$settings.routerControl.commandTimeoutSeconds } else { 25 }
+$passwordEnvVar = if ($router.adminPasswordEnvVar) { [string]$router.adminPasswordEnvVar } elseif ($settings.routerControl.defaultPasswordEnvVar) { [string]$settings.routerControl.defaultPasswordEnvVar } else { "" }
+$routerPassword = if ($passwordEnvVar) { [Environment]::GetEnvironmentVariable($passwordEnvVar, "Process") } else { "" }
+if (-not $routerPassword -and $passwordEnvVar) {
+  $routerPassword = [Environment]::GetEnvironmentVariable($passwordEnvVar, "User")
+}
+if (-not $routerPassword -and $passwordEnvVar) {
+  $routerPassword = [Environment]::GetEnvironmentVariable($passwordEnvVar, "Machine")
+}
 
 $routerHost = [string]$router.host
 if ([string]::IsNullOrWhiteSpace($routerHost)) {
@@ -137,12 +177,60 @@ if ([string]::IsNullOrWhiteSpace($routerHost)) {
   exit 1
 }
 
+$plinkCommand = Get-Command "plink.exe" -ErrorAction SilentlyContinue
+$routerHostKey = if ($router.sshHostKey) {
+  [string]$router.sshHostKey
+} elseif ($settings.routerControl.defaultHostKeys -and ($settings.routerControl.defaultHostKeys.PSObject.Properties.Name -contains $routerHost)) {
+  [string]$settings.routerControl.defaultHostKeys.$routerHost
+} else {
+  ""
+}
+$usePlink = [bool]($routerPassword -and $plinkCommand -and $routerHostKey)
+if ($usePlink) {
+  $sshPath = $plinkCommand.Source
+}
+
 $commandMap = @{
   "router-health" = "ubus call system board"
   "reboot-router" = "sh -c '(sleep 1; reboot) >/dev/null 2>&1 &'"
   "restart-wifi" = "wifi reload"
   "wan-reconnect" = "ifup wan || /etc/init.d/network restart"
-  "usb-tether-reset" = "ifdown wan; sleep 2; ifup wan"
+  "usb-tether-reset" = @'
+sh -c '
+get_public_ip() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL https://api.ipify.org 2>/dev/null || true
+  elif command -v uclient-fetch >/dev/null 2>&1; then
+    uclient-fetch -qO- https://api.ipify.org 2>/dev/null || true
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO- https://api.ipify.org 2>/dev/null || true
+  fi
+}
+tether_json="$(ifstatus tethering 2>/dev/null || true)"
+iface="$(printf "%s" "$tether_json" | jsonfilter -e "@.l3_device" 2>/dev/null || true)"
+[ -n "$iface" ] || iface="$(printf "%s" "$tether_json" | jsonfilter -e "@.device" 2>/dev/null || true)"
+before_ip="$(get_public_ip)"
+if [ -n "$iface" ] && [ -e "/sys/class/net/$iface/device/driver/unbind" ]; then
+  devnode="$(basename "$(readlink -f "/sys/class/net/$iface/device")")"
+  drvpath="$(readlink -f "/sys/class/net/$iface/device/driver")"
+  printf "%s" "$devnode" > "$drvpath/unbind"
+  sleep 4
+  printf "%s" "$devnode" > "$drvpath/bind"
+  sleep 6
+else
+  ifdown tethering >/dev/null 2>&1 || true
+  sleep 4
+  ifup tethering >/dev/null 2>&1 || true
+  sleep 6
+fi
+ifup tethering >/dev/null 2>&1 || true
+sleep 8
+after_ip="$(get_public_ip)"
+echo "BEFORE_PUBLIC_IP=$before_ip"
+echo "AFTER_PUBLIC_IP=$after_ip"
+ifstatus tethering 2>/dev/null || true
+'
+'@
 }
 
 $routerCommand = $commandMap[$Action]
@@ -293,6 +381,61 @@ if ($Action -eq "router-health") {
       uplinkInterface = $uplinkInterface
       uplinkMode = $uplinkMode
       uplinkRaw = $uplinkRaw
+    }
+  }
+  exit 0
+}
+
+if ($Action -eq "usb-tether-reset") {
+  $resetResult = Invoke-SshCommand -Command $routerCommand
+  if ($resetResult.ExitCode -ne 0) {
+    Write-Result -Success:$false -Message "USB tether reset failed." -Extra @{
+      host = $routerHost
+      exitCode = $resetResult.ExitCode
+      detail = $resetResult.Output
+      requiresConfiguration = $true
+    }
+    exit 1
+  }
+
+  $beforePublicIp = ""
+  $afterPublicIp = ""
+  $tetheringJson = $null
+  foreach ($line in ($resetResult.Output -split '\r?\n')) {
+    if ($line -like "BEFORE_PUBLIC_IP=*") {
+      $beforePublicIp = ($line -replace '^BEFORE_PUBLIC_IP=', '').Trim()
+    } elseif ($line -like "AFTER_PUBLIC_IP=*") {
+      $afterPublicIp = ($line -replace '^AFTER_PUBLIC_IP=', '').Trim()
+    } elseif ($line.Trim().StartsWith("{")) {
+      try {
+        $tetheringJson = $line | ConvertFrom-Json -ErrorAction Stop
+      } catch {
+        $tetheringJson = $null
+      }
+    }
+  }
+
+  $tetheringState = if ($tetheringJson -and $tetheringJson.up) { "connected" } elseif ($tetheringJson) { "disconnected" } else { "" }
+  $tetheringDevice = if ($tetheringJson) {
+    if ($tetheringJson.l3_device) { [string]$tetheringJson.l3_device } elseif ($tetheringJson.device) { [string]$tetheringJson.device } else { "" }
+  } else {
+    ""
+  }
+
+  Write-Result -Success:$true -Message "USB tether reset completed." -Extra @{
+    host = $routerHost
+    detail = $resetResult.Output
+    beforePublicIp = $beforePublicIp
+    afterPublicIp = $afterPublicIp
+    publicIpChanged = [bool]($beforePublicIp -and $afterPublicIp -and $beforePublicIp -ne $afterPublicIp)
+    telemetry = @{
+      mode = ""
+      tetheringState = $tetheringState
+      tetheringDevice = $tetheringDevice
+      publicIp = $afterPublicIp
+      previousPublicIp = $beforePublicIp
+      uplinkMode = if ($afterPublicIp) { "router-uplink" } else { "" }
+      uplinkInterface = $tetheringDevice
     }
   }
   exit 0
