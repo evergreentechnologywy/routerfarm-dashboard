@@ -20,6 +20,7 @@ $ErrorActionPreference = "Stop"
 # Resolve APK path
 if ([string]::IsNullOrWhiteSpace($ApkPath)) {
     $candidates = @(
+        "config/routerfarm-ip-helper.apk",
         "android/routerfarm-ip-helper/app/build/outputs/apk/debug/app-debug.apk",
         "android/routerfarm-ip-helper/app/build/outputs/apk/release/app-release.apk",
         "android/routerfarm-ip-helper/build/outputs/apk/debug/app-debug.apk",

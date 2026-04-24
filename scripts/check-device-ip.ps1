@@ -224,15 +224,25 @@ function Get-PublicIpFromHelper {
 
   $packageName = "com.routerfarm.iphelper"
   $componentName = "com.routerfarm.iphelper/.MainActivity"
+  $fallbackPackageName = "com.phonefarm.iphelper"
+  $fallbackComponentName = "com.phonefarm.iphelper/.MainActivity"
 
   $packageResult = Invoke-Adb -Arguments @("-s", $Serial, "shell", "pm", "path", $packageName)
   if ($packageResult.ExitCode -ne 0 -or $packageResult.Output -notmatch "package:") {
-    return [pscustomobject]@{
-      success = $false
-      ip = ""
-      source = ""
-      error = "RouterFarm IP Helper is not installed on this device."
-      missingHelper = $true
+    # Try legacy package name for backward compatibility
+    $packageResult = Invoke-Adb -Arguments @("-s", $Serial, "shell", "pm", "path", $fallbackPackageName)
+    if ($packageResult.ExitCode -eq 0 -and $packageResult.Output -match "package:") {
+      $packageName = $fallbackPackageName
+      $componentName = $fallbackComponentName
+    }
+    else {
+      return [pscustomobject]@{
+        success = $false
+        ip = ""
+        source = ""
+        error = "RouterFarm IP Helper is not installed on this device."
+        missingHelper = $true
+      }
     }
   }
 
