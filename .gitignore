@@ -5,6 +5,10 @@ tmp/
 routerfarm.pid
 phonefarm.pid
 config/state.json
+config/settings.json
+config/devices.json
+config/routers.json
+config/users.json
 config/device-ip-history.json
 config/routing-audit.json
 config/*.apk

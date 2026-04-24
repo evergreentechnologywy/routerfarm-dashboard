@@ -1,10 +1,15 @@
 param(
-  [string]$DevicesPath = "C:\RouterFarm\config\devices.json",
-  [string]$RoutersPath = "C:\RouterFarm\config\routers.json",
+  [string]$DevicesPath,
+  [string]$RoutersPath,
   [switch]$PreserveExistingAssignments
 )
 
 $ErrorActionPreference = "Stop"
+
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$workspaceRoot = Split-Path -Parent $scriptRoot
+if (-not $DevicesPath) { $DevicesPath = Join-Path $workspaceRoot "config\\devices.json" }
+if (-not $RoutersPath) { $RoutersPath = Join-Path $workspaceRoot "config\\routers.json" }
 
 if (-not (Test-Path -LiteralPath $DevicesPath)) {
   throw "Devices config not found: $DevicesPath"

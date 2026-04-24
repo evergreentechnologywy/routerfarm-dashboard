@@ -41,6 +41,21 @@ Still intentionally incomplete:
 - real power relay or smart outlet integration for uplink power cycling
 - router health polling beyond on-demand actions
 
+## Setup
+
+1. Copy config templates:
+   ```powershell
+   copy config\settings.template.json config\settings.json
+   copy config\devices.template.json config\devices.json
+   copy config\routers.template.json config\routers.json
+   copy config\users.template.json config\users.json
+   ```
+2. Edit `config\settings.json` with your local `adb.exe` and `scrcpy.exe` paths.
+3. Run deployment:
+   ```powershell
+   .\deploy-routerfarm.ps1
+   ```
+
 ## Folder Layout
 
 - `config/settings.json`
