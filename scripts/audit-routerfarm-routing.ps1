@@ -121,5 +121,5 @@ $result = [pscustomobject]@{
   checks = $checks
 }
 
-$result | ConvertTo-Json -Depth 6 | Set-Content -Path $outputPath
+$result | ConvertTo-Json -Depth 6 | Set-Content -Path $outputPath -Encoding utf8NoBOM
 Write-Output $result.summary

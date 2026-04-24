@@ -1,0 +1,1 @@
+[   24822ms] "jsonrpc":"2.0","id":21,"method":"call","params":["dzRC27Qjyfn7eg4RhdipYkQKVwjd4T70","repeater","get_status",{}]},"error":{"message":"Access denied","code":-32000}}

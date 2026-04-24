@@ -1,0 +1,48 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - list [ref=e5]:
+      - listitem [ref=e6]
+      - listitem [ref=e7]
+    - generic:
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - img [ref=e12]
+          - paragraph [ref=e64]: GL-SFT1200
+          - heading "Choose Your Language" [level=3] [ref=e65]
+        - generic [ref=e67]:
+          - generic [ref=e70]:
+            - textbox "请选择" [ref=e71] [cursor=pointer]: English
+            - generic [ref=e73] [cursor=pointer]: 
+          - button "Next" [ref=e75] [cursor=pointer]
+      - generic [ref=e76]:
+        - generic [ref=e77]:
+          - heading "Set Up Your Admin Password" [level=3] [ref=e78]
+          - list [ref=e80]:
+            - listitem [ref=e81]:
+              - generic [ref=e82]: New Password
+              - generic [ref=e83]:
+                - textbox "Please enter password" [active] [ref=e84]: Admin2023#
+                - generic [ref=e97]: 
+            - listitem [ref=e85]:
+              - generic [ref=e86]: Confirm Password
+              - generic [ref=e87]:
+                - textbox "Must be identical to above" [ref=e88]: Admin2023#
+                - generic [ref=e108]: 
+            - listitem [ref=e89]:
+              - generic [ref=e90]:
+                - generic [ref=e92]: 
+                - generic [ref=e93]: GL.iNet will not collect any personal data of users unless GL.iNet cloud service is enabled.
+        - generic [ref=e94]:
+          - button "Back" [ref=e95] [cursor=pointer]
+          - button "Apply" [ref=e96] [cursor=pointer]
+  - 'tooltip " Minimum 10 characters and maximum 63 characters  Letters (case sensitive), numbers and symbols !@#$%^&*()_+-=,.><|?/\\[]{}:;\"''`~ are allowed  At least two of uppercase letters, lowercase letters, numbers, and symbols are required" [ref=e110]':
+    - generic [ref=e99]:
+      - generic [ref=e100]:
+        - generic [ref=e101]: 
+        - text: Minimum 10 characters and maximum 63 characters
+      - generic [ref=e102]:
+        - generic [ref=e103]: 
+        - text: "Letters (case sensitive), numbers and symbols !@#$%^&*()_+-=,.><|?/\\[]{}:;\"'`~ are allowed"
+      - generic [ref=e104]:
+        - generic [ref=e105]: 
+        - text: At least two of uppercase letters, lowercase letters, numbers, and symbols are required

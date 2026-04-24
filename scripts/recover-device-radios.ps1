@@ -52,6 +52,23 @@ function Get-DeviceConfig {
   }
 }
 
+function Get-NormalizedRole {
+  param([string]$Role)
+
+  if ([string]::IsNullOrWhiteSpace($Role)) {
+    $normalized = "sim-direct"
+  } else {
+    $normalized = $Role.Trim().ToLowerInvariant()
+  }
+  switch ($normalized) {
+    "router-client" { return "router-linkpro" }
+    "opal-client" { return "router-linkpro" }
+    "router-linkpro" { return "router-linkpro" }
+    "linkpro-routed" { return "router-linkpro" }
+    default { return $normalized }
+  }
+}
+
 function Invoke-Adb {
   param(
     [string[]]$Arguments,
@@ -103,7 +120,7 @@ function Wait-ForDeviceOnline {
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
   while ((Get-Date) -lt $deadline) {
     $result = Invoke-Adb -Arguments @("-s", $Serial, "get-state") -IgnoreErrors
-    if ($result.Output -match "device") {
+    if (($result.Output | Out-String).Trim() -eq "device") {
       return
     }
     Start-Sleep -Seconds 3
@@ -113,6 +130,8 @@ function Wait-ForDeviceOnline {
 
 function Set-AirplaneModeOff {
   Write-RecoverLog -Category "recover" -Message "Attempting to force airplane mode off"
+  
+  # Try MacroDroid Helper first as it is more reliable for system settings
   $helperResult = Invoke-MacroDroidHelper -ExtraArguments @(
     "--es", "command_type", "set_system_setting",
     "--es", "setting_type", "global",
@@ -121,9 +140,8 @@ function Set-AirplaneModeOff {
     "--es", "setting_value", "0",
     "--es", "macro_name", "PhoneFarm Recover"
   )
-  if ($helperResult.ExitCode -eq 0) {
-    Write-RecoverLog -Category "recover" -Message "MacroDroid Helper accepted airplane-mode clear request"
-  }
+  
+  # Also try direct ADB settings and broadcasts
   $attempts = @(
     @("shell", "settings", "put", "global", "airplane_mode_on", "0"),
     @("shell", "cmd", "connectivity", "airplane-mode", "disable"),
@@ -138,6 +156,7 @@ function Set-AirplaneModeOff {
   Start-Sleep -Seconds 3
   $verify = Invoke-Adb -Arguments @("-s", $Serial, "shell", "settings", "get", "global", "airplane_mode_on") -IgnoreErrors
   Write-RecoverLog -Category "recover" -Message ("Airplane mode verify => exit " + $verify.ExitCode + " output=" + $verify.Output)
+  return ($verify.Output -eq "0")
 }
 
 function Ensure-MobileDataEnabled {
@@ -145,17 +164,17 @@ function Ensure-MobileDataEnabled {
   Write-RecoverLog -Category "recover" -Message ("Mobile data enable => exit " + $result.ExitCode + " output=" + $result.Output)
 }
 
-function Ensure-WifiEnabledWithHelper {
-  $result = Invoke-MacroDroidHelper -ExtraArguments @(
+function Ensure-WifiEnabled {
+  Write-RecoverLog -Category "recover" -Message "Attempting to enable Wi-Fi"
+  
+  # Try MacroDroid Helper first
+  $helperResult = Invoke-MacroDroidHelper -ExtraArguments @(
     "--es", "command_type", "set_wifi",
     "--ei", "wifi_state", "1",
     "--es", "macro_name", "PhoneFarm Recover"
   )
-  Write-RecoverLog -Category "recover" -Message ("Wi-Fi helper enable => exit " + $result.ExitCode + " output=" + $result.Output)
-}
-
-function Ensure-WifiEnabled {
-  Ensure-WifiEnabledWithHelper
+  
+  # Standard ADB methods
   $attempts = @(
     @("shell", "svc", "wifi", "enable"),
     @("shell", "cmd", "wifi", "set-wifi-enabled", "enabled")
@@ -174,16 +193,40 @@ try {
 
   Write-RecoverLog -Category "recover" -Message "Radio recovery started"
   Wait-ForDeviceOnline
-  Set-AirplaneModeOff
+  
+  $airplaneCleared = Set-AirplaneModeOff
   Ensure-MobileDataEnabled
-  if ($deviceConfig.role -eq "hotspot-client") {
+  
+  $normalizedRole = Get-NormalizedRole $deviceConfig.role
+  $wifiAttempted = $false
+  if ($normalizedRole -eq "hotspot-client" -or $normalizedRole -eq "router-linkpro") {
     Ensure-WifiEnabled
-    Write-RecoverLog -Category "recover" -Message "Hotspot-client role detected; Wi-Fi recovery attempted"
+    $wifiAttempted = $true
+    Write-RecoverLog -Category "recover" -Message "Wi-Fi-routed role detected; Wi-Fi recovery attempted"
   }
+  
   Write-RecoverLog -Category "recover" -Message "Radio recovery completed"
+  
+  $finalResult = @{
+    ok = $true
+    serial = $Serial
+    airplaneModeOff = $airplaneCleared
+    wifiAttempted = $wifiAttempted
+    timestamp = (Get-Date).ToString("o")
+  }
+  Write-Output ($finalResult | ConvertTo-Json -Compress)
   exit 0
 }
 catch {
-  Write-RecoverLog -Category "recover" -Message ("Radio recovery failed: " + $_.Exception.Message)
+  $errorMessage = $_.Exception.Message
+  Write-RecoverLog -Category "recover" -Message ("Radio recovery failed: " + $errorMessage)
+  
+  $finalResult = @{
+    ok = $false
+    serial = $Serial
+    error = $errorMessage
+    timestamp = (Get-Date).ToString("o")
+  }
+  Write-Output ($finalResult | ConvertTo-Json -Compress)
   exit 1
 }

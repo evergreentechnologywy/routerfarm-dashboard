@@ -6,6 +6,7 @@ const state = {
     role: "admin",
     allowedDevices: ["*"]
   },
+  activeTab: "routers",
   viewMode: "cards",
   pendingActions: {},
   filters: {
@@ -54,6 +55,10 @@ const heroSecondaryNote = document.getElementById("heroSecondaryNote");
 const heroTertiaryValue = document.getElementById("heroTertiaryValue");
 const heroTertiaryNote = document.getElementById("heroTertiaryNote");
 const statsGrid = document.getElementById("statsGrid");
+const routersTabButton = document.getElementById("routersTabButton");
+const devicesTabButton = document.getElementById("devicesTabButton");
+const routersWorkspace = document.getElementById("routersWorkspace");
+const devicesWorkspace = document.getElementById("devicesWorkspace");
 const rackOverviewBadge = document.getElementById("rackOverviewBadge");
 const rackOverviewGrid = document.getElementById("rackOverviewGrid");
 const deviceCount = document.getElementById("deviceCount");
@@ -147,6 +152,8 @@ readyOnlyToggle.addEventListener("change", event => {
   state.filters.readyOnly = event.target.checked;
   render();
 });
+routersTabButton?.addEventListener("click", () => setActiveTab("routers"));
+devicesTabButton?.addEventListener("click", () => setActiveTab("devices"));
 cardViewButton.addEventListener("click", () => setViewMode("cards"));
 tableViewButton.addEventListener("click", () => setViewMode("table"));
 showAllButton.addEventListener("click", () => clearQuickFilters());
@@ -239,10 +246,19 @@ async function ensureUserLoaded(force = false) {
 
 function setViewMode(mode) {
   state.viewMode = mode;
+  if (mode === "cards" || mode === "table") {
+    state.activeTab = "devices";
+  }
   cardViewButton.classList.toggle("is-active", mode === "cards");
   tableViewButton.classList.toggle("is-active", mode === "table");
   appShell.classList.toggle("table-mode", mode === "table");
+  syncTabState();
   renderDeviceViews();
+}
+
+function setActiveTab(tab) {
+  state.activeTab = tab === "devices" ? "devices" : "routers";
+  syncTabState();
 }
 
 async function handleLogout() {
@@ -323,22 +339,52 @@ function buildSummaryStatsSignature(stats) {
   return stats.map(stat => `${stat.label}:${stat.value}:${stat.tone}`).join("|");
 }
 
-function buildHeroInsightsSignature(data, visibleDevices) {
+function getHeroInsightsMetrics(data, visibleDevices) {
   const routers = data?.routers || [];
   const prepActive = data?.prepTelemetry?.active || null;
-  const readyRouters = routers.filter(router => {
+  const enabledRouters = routers.filter(router => router.enabled !== false);
+  const readyRouters = enabledRouters.filter(router => {
     const routerState = router.routerState || {};
     return routerState.healthStatus === "online"
       && String(routerState.routerMode || "").toLowerCase() === "router"
       && String(routerState.uplinkMode || "").toLowerCase() === "router-uplink";
+  });
+  const blockedDevices = (visibleDevices || []).filter(device => shouldDisableAction(device, "start-session"));
+  const routedDevices = (data?.devices || []).filter(device => normalizeRole(device.role) === "router-linkpro");
+  const simDirectDevices = (data?.devices || []).filter(device => normalizeRole(device.role) === "sim-direct");
+  const noUplinkRouters = enabledRouters.filter(router => String(router.routerState?.tetheringState || "").toLowerCase() === "no-device").length;
+  const apRouters = enabledRouters.filter(router => String(router.routerState?.routerMode || "").toLowerCase() === "ap").length;
+  const unreachableRouters = enabledRouters.filter(router => {
+    const routerState = router.routerState || {};
+    return routerState.healthStatus === "offline" || Boolean(routerState.lastError);
   }).length;
-  const blockedDevices = (visibleDevices || []).filter(device => shouldDisableAction(device, "start-session")).length;
-  return [
-    data?.routingGuard?.blocked ? "1" : "0",
+  return {
+    prepActive,
+    enabledRouters,
     readyRouters,
     blockedDevices,
-    prepActive?.serial || "",
-    prepActive?.elapsedMs || 0
+    routedDevices,
+    simDirectDevices,
+    noUplinkRouters,
+    apRouters,
+    unreachableRouters
+  };
+}
+
+function buildHeroInsightsSignature(data, visibleDevices) {
+  const metrics = getHeroInsightsMetrics(data, visibleDevices);
+  return [
+    data?.routingGuard?.blocked ? "1" : "0",
+    metrics.enabledRouters.length,
+    metrics.readyRouters.length,
+    metrics.blockedDevices.length,
+    metrics.routedDevices.length,
+    metrics.simDirectDevices.length,
+    metrics.noUplinkRouters,
+    metrics.apRouters,
+    metrics.unreachableRouters,
+    metrics.prepActive?.serial || "",
+    metrics.prepActive?.elapsedMs || 0
   ].join("|");
 }
 
@@ -455,6 +501,10 @@ function buildDeviceSignature(device) {
     device.publicIp?.currentIp || "",
     device.publicIp?.status || "",
     device.publicIp?.lastCheckedAt || "",
+    device.publicIp?.location?.city || "",
+    device.publicIp?.location?.region || "",
+    device.publicIp?.location?.country || "",
+    device.publicIp?.location?.timezone || "",
     device.publicIp?.changedSinceLastPrep ? "1" : "0",
     device.publicIp?.reusedRecently ? "1" : "0",
     (device.publicIp?.duplicateWith || []).join(","),
@@ -512,6 +562,7 @@ function createEmptyStateElement(tagName, className, text, colSpan = 0) {
 function render() {
   appShell.hidden = false;
   appShell.classList.toggle("table-mode", state.viewMode === "table");
+  syncTabState();
   setTextIfChanged(currentUser, `${state.user?.displayName || "Operator"} (${state.user?.role || "admin"})`);
   setTextIfChanged(liveClock, formatNow());
 
@@ -601,6 +652,26 @@ function syncControls() {
   readyOnlyToggle.checked = state.filters.readyOnly;
 }
 
+function syncTabState() {
+  const routersActive = state.activeTab === "routers";
+  if (routersTabButton) {
+    routersTabButton.classList.toggle("is-active", routersActive);
+    routersTabButton.setAttribute("aria-selected", routersActive ? "true" : "false");
+  }
+  if (devicesTabButton) {
+    devicesTabButton.classList.toggle("is-active", !routersActive);
+    devicesTabButton.setAttribute("aria-selected", routersActive ? "false" : "true");
+  }
+  if (routersWorkspace) {
+    routersWorkspace.hidden = !routersActive;
+    routersWorkspace.classList.toggle("is-active", routersActive);
+  }
+  if (devicesWorkspace) {
+    devicesWorkspace.hidden = routersActive;
+    devicesWorkspace.classList.toggle("is-active", !routersActive);
+  }
+}
+
 function renderHeroGuard(routingGuard) {
   const blocked = Boolean(routingGuard?.blocked);
   setTextIfChanged(routeGuardBadge, blocked ? "Prep Guard Blocked" : "Prep Guard Clear");
@@ -608,24 +679,17 @@ function renderHeroGuard(routingGuard) {
 }
 
 function renderHeroInsights(data, visibleDevices) {
-  const routers = data?.routers || [];
-  const readyRouters = routers.filter(router => {
-    const routerState = router.routerState || {};
-    return routerState.healthStatus === "online"
-      && String(routerState.routerMode || "").toLowerCase() === "router"
-      && String(routerState.uplinkMode || "").toLowerCase() === "router-uplink";
-  });
-  const blockedDevices = (visibleDevices || []).filter(device => shouldDisableAction(device, "start-session"));
-  const prepActive = data?.prepTelemetry?.active || null;
-  const noUplinkRouters = routers.filter(router => String(router.routerState?.tetheringState || "").toLowerCase() === "no-device").length;
-  const apRouters = routers.filter(router => String(router.routerState?.routerMode || "").toLowerCase() === "ap").length;
+  const metrics = getHeroInsightsMetrics(data, visibleDevices);
+  const readyRouters = metrics.readyRouters;
+  const blockedDevices = metrics.blockedDevices;
+  const prepActive = metrics.prepActive;
 
-  setTextIfChanged(heroPrimaryValue, `${readyRouters.length}/${routers.length || 0}`);
+  setTextIfChanged(heroPrimaryValue, `${readyRouters.length}/${metrics.enabledRouters.length || 0}`);
   setTextIfChanged(
     heroPrimaryNote,
     readyRouters.length
-      ? "Routed Opals with a healthy uplink and a session-safe path."
-      : "No Opals are fully session-ready yet. Promote one working router template first."
+      ? `${metrics.routedDevices.length} routed phone${metrics.routedDevices.length === 1 ? "" : "s"} are currently assigned across the LinkPro pool.`
+      : "No enabled Opals are fully session-ready yet. Promote one working router template first."
   );
 
   setTextIfChanged(heroSecondaryValue, String(blockedDevices.length));
@@ -647,18 +711,22 @@ function renderHeroInsights(data, visibleDevices) {
   const narrative = data?.routingGuard?.blocked
     ? "Desktop routing safety is blocking prep. Resolve the host path before launching phones."
     : readyRouters.length === 0
-      ? `Rack is reachable but not session-ready. ${apRouters} router(s) remain in AP mode and ${noUplinkRouters} report no USB uplink device.`
+      ? `Rack is reachable but not session-ready. ${metrics.apRouters} router(s) remain in AP mode, ${metrics.noUplinkRouters} report no USB uplink device, and ${metrics.unreachableRouters} are unreachable.`
       : blockedDevices.length > 0
         ? `${blockedDevices.length} phone(s) still need clearance before launch. Prioritize duplicate IP and activation lock issues.`
-        : "Rack is in a clean operator state. Filter by ready devices and launch controlled sessions.";
+        : `Rack is in a clean operator state. ${metrics.simDirectDevices.length} SIM-direct phone${metrics.simDirectDevices.length === 1 ? "" : "s"} stay outside routed prep while LinkPro phones wait for certified fresh IPs.`;
   setTextIfChanged(heroNarrative, narrative);
 }
 
 function buildSummaryStats(devices) {
   const routers = state.data?.routers || [];
+  const routedDevices = devices.filter(device => normalizeRole(device.role) === "router-linkpro");
+  const simDirectDevices = devices.filter(device => normalizeRole(device.role) === "sim-direct");
   return [
     { label: "Fleet", value: devices.length, tone: "neutral", onClick: () => clearQuickFilters() },
     { label: "Router Pool", value: routers.length, tone: "neutral", onClick: () => focusSearch() },
+    { label: "SIM Direct", value: simDirectDevices.length, tone: "neutral", onClick: () => applyQuickFilter({ role: "sim-direct" }) },
+    { label: "LinkPro Routed", value: routedDevices.length, tone: "info", onClick: () => applyQuickFilter({ role: "router-linkpro" }) },
     { label: "Online", value: devices.filter(device => device.online).length, tone: "success", onClick: () => applyQuickFilter({ status: "online" }) },
     { label: "Queued", value: devices.filter(device => device.prepState === "queued").length, tone: "warning", onClick: () => applyQuickFilter({ status: "queued" }) },
     { label: "Preparing", value: devices.filter(device => device.prepState === "preparing").length, tone: "info", onClick: () => applyQuickFilter({ status: "preparing" }) },
@@ -755,6 +823,7 @@ function renderContextBar(allDevices, visibleDevices) {
 }
 
 function applyQuickFilter(patch) {
+  state.activeTab = "devices";
   state.filters = {
     ...state.filters,
     ...patch
@@ -763,6 +832,7 @@ function applyQuickFilter(patch) {
 }
 
 function clearQuickFilters() {
+  state.activeTab = "devices";
   state.filters = {
     search: "",
     status: "all",
@@ -774,6 +844,8 @@ function clearQuickFilters() {
 }
 
 function focusSearch() {
+  state.activeTab = "devices";
+  syncTabState();
   searchInput.focus();
   searchInput.select();
 }
@@ -1053,6 +1125,33 @@ function renderTableView(devices) {
   deviceTableBody.replaceChildren(fragment);
 }
 
+function formatIpLocation(publicIp) {
+  const location = publicIp?.location;
+  if (!location) {
+    return "";
+  }
+  const cityRegion = [location.city, location.region].filter(Boolean).join(", ");
+  return cityRegion || location.country || "";
+}
+
+function formatIpTimezone(publicIp) {
+  return publicIp?.location?.timezone || "";
+}
+
+function formatIpStatusSummary(publicIp) {
+  const status = (publicIp?.status || "unknown").toUpperCase();
+  const location = formatIpLocation(publicIp);
+  return location ? `${status} • ${location}` : status;
+}
+
+function formatIpLastChecked(publicIp) {
+  if (!publicIp?.lastCheckedAt) {
+    return formatIpTimezone(publicIp) || "No successful check";
+  }
+  const timezone = formatIpTimezone(publicIp);
+  return timezone ? `${formatDateTime(publicIp.lastCheckedAt)} • ${timezone}` : formatDateTime(publicIp.lastCheckedAt);
+}
+
 function createDeviceTableRow(device, signature = buildDeviceSignature(device)) {
   const row = document.createElement("tr");
   row.dataset.serial = device.serial;
@@ -1099,13 +1198,13 @@ function createDeviceTableRow(device, signature = buildDeviceSignature(device)) 
     <td>
       <div class="table-stack">
         <strong class="table-code">${escapeHtml(device.publicIp?.currentIp || "Not checked")}</strong>
-        <span class="table-subline">${escapeHtml((device.publicIp?.status || "unknown").toUpperCase())}</span>
+        <span class="table-subline">${escapeHtml(formatIpStatusSummary(device.publicIp))}</span>
       </div>
     </td>
     <td>
       <div class="table-stack">
         <strong>${escapeHtml(device.publicIp?.lastCheckedAt ? formatShortTime(device.publicIp.lastCheckedAt) : "-")}</strong>
-        <span class="table-subline">${escapeHtml(device.publicIp?.lastCheckedAt ? formatDateTime(device.publicIp.lastCheckedAt) : "No successful check")}</span>
+        <span class="table-subline">${escapeHtml(device.publicIp?.lastCheckedAt ? formatIpLastChecked(device.publicIp) : (formatIpTimezone(device.publicIp) || "No successful check"))}</span>
       </div>
     </td>
     <td>
@@ -1219,8 +1318,8 @@ function renderDeviceCard(device) {
   prepBadge.className = `badge prep-badge ${prepBadgeClass(device.prepState)}`;
   gmailValue.textContent = formatGmail(device.account);
   publicIpValue.textContent = device.publicIp?.currentIp || "Not checked";
-  lastCheckedValue.textContent = device.publicIp?.lastCheckedAt ? formatDateTime(device.publicIp.lastCheckedAt) : "-";
-  ipStatusValue.textContent = (device.publicIp?.status || "unknown").toUpperCase();
+  lastCheckedValue.textContent = device.publicIp?.lastCheckedAt ? formatIpLastChecked(device.publicIp) : (formatIpTimezone(device.publicIp) || "-");
+  ipStatusValue.textContent = formatIpStatusSummary(device.publicIp);
   routerValue.textContent = device.routerLabel || device.routerId || "Unassigned";
   routeRiskValue.textContent = device.routingRisk?.label || "Unknown";
   sessionValue.textContent = formatSession(device.sessionState);
@@ -1296,12 +1395,13 @@ function filterDevices(devices) {
   return devices.filter(device => {
     const searchTarget = `${device.nickname || ""} ${device.serial} ${device.phoneNumber || ""} ${formatGmail(device.account)} ${device.publicIp?.currentIp || ""}`.toLowerCase();
     const routerTarget = `${device.routerLabel || ""} ${device.routerId || ""} ${device.routerSsid || ""}`.toLowerCase();
+    const normalizedRole = normalizeRole(device.role);
     const statusMatch =
       state.filters.status === "all" ||
       (state.filters.status === "online" && device.online) ||
       (state.filters.status === "offline" && !device.online) ||
       device.prepState === state.filters.status;
-    const roleMatch = state.filters.role === "all" || (device.role || "sim-direct") === state.filters.role;
+    const roleMatch = state.filters.role === "all" || normalizedRole === state.filters.role;
     const warningsMatch = !state.filters.warningsOnly || hasWarning(device);
     const readyMatch = !state.filters.readyOnly || device.prepState === "ready";
     const searchMatch = !state.filters.search || searchTarget.includes(state.filters.search) || routerTarget.includes(state.filters.search);
@@ -1328,6 +1428,10 @@ function isReused(device) {
 }
 
 function buildReuseWarning(device) {
+  const normalizedRole = normalizeRole(device.role);
+  if (normalizedRole !== "router-linkpro") {
+    return device.routingRisk?.detail || "SIM-direct devices do not require router assignment.";
+  }
   if (!device.routerId) {
     return "Router assignment required before this phone can be activated.";
   }
@@ -1351,7 +1455,7 @@ function buildIpHistorySummary(device) {
 
 function deviceWarningLabel(device) {
   if (!device.online) return "Offline";
-  if (!device.routerId) return "Router Needed";
+  if (normalizeRole(device.role) === "router-linkpro" && !device.routerId) return "Router Needed";
   if (isDuplicate(device)) return "Duplicate IP";
   if (isReused(device)) return "Reused IP";
   if (device.activationLock?.allowed === false) return "Activation Locked";
@@ -1386,6 +1490,7 @@ function routerBlocksSession(router) {
 function shouldDisableAction(device, action) {
   if (!device?.serial) return true;
   if (isActionPending(device.serial, action)) return true;
+  const normalizedRole = normalizeRole(device.role);
   if (action === "prep") {
     return !device.online ||
       device.sessionState === "running" ||
@@ -1397,11 +1502,11 @@ function shouldDisableAction(device, action) {
     const assignedRouter = getRouterForDevice(device);
     return Boolean(state.data?.routingGuard?.blocked) ||
       !device.activationLock?.allowed ||
-      Boolean(state.data?.settings?.ipReusePolicy?.blockSessionStartOnReuse && device.publicIp?.reusePolicyViolation) ||
-      (device.routerId && routerBlocksSession(assignedRouter));
+      Boolean(normalizedRole === "router-linkpro" && state.data?.settings?.ipReusePolicy?.blockSessionStartOnReuse && device.publicIp?.reusePolicyViolation) ||
+      (normalizedRole === "router-linkpro" && device.routerId && routerBlocksSession(assignedRouter));
   }
   if (action === "connect-router" || action === "reset-uplink-ip") {
-    return !device.routerId;
+    return normalizedRole !== "router-linkpro" || !device.routerId;
   }
   return false;
 }
@@ -1502,7 +1607,7 @@ function openDeviceEditor(serial) {
   deviceEditorSubtitle.textContent = `${device.serial} ${device.transportId ? `| Transport ${device.transportId}` : ""}`.trim();
   editorNickname.value = device.nickname || "";
   editorPhoneNumber.value = device.phoneNumber || "";
-  editorRole.value = device.role || "sim-direct";
+  editorRole.value = normalizeRole(device.role);
   editorRouterId.value = device.routerId || "";
   editorRouterSlot.value = device.routerSlot || "";
   editorParentHotspotSerial.value = device.parentHotspotSerial || "";
@@ -1632,13 +1737,28 @@ async function invokeDesktopViewerAction(serial, action, body = {}) {
 }
 
 function formatRole(role) {
-  if (role === "hotspot-client") {
+  const normalizedRole = normalizeRole(role);
+  if (normalizedRole === "hotspot-client") {
     return "Hotspot Client";
   }
-  if (role === "opal-client") {
-    return "Opal Client";
+  if (normalizedRole === "router-linkpro") {
+    return "LinkPro Routed";
   }
   return "SIM Direct";
+}
+
+function normalizeRole(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (!normalized || normalized === "sim-direct") {
+    return "sim-direct";
+  }
+  if (["router-client", "opal-client", "router-linkpro", "linkpro-routed"].includes(normalized)) {
+    return "router-linkpro";
+  }
+  if (normalized === "hotspot-client") {
+    return "hotspot-client";
+  }
+  return normalized;
 }
 
 function formatDateTime(value) {

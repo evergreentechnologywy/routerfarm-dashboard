@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RouterFarm Desktop v20260414a</title>
+    <title>RouterFarm Desktop vv20260424</title>
     <script>
       (function setRouterFarmBasePath() {
         const isFileProtocol = window.location.protocol === "file:";
@@ -15,7 +15,7 @@
         document.head.appendChild(base);
       })();
     </script>
-    <link rel="stylesheet" href="styles.css?v=20260414a" />
+    <link rel="stylesheet" href="styles.css?v=v20260424" />
   </head>
   <body>
     <div class="shell-backdrop" aria-hidden="true">
@@ -36,16 +36,14 @@
           <div class="nav-stack">
             <div class="nav-card nav-card-primary">
               <span class="nav-label">Live Build</span>
-              <strong>20260414a</strong>
+              <strong>v20260424</strong>
               <p>Desktop-native routing, prep, and IP controls.</p>
             </div>
             <div class="nav-card">
               <span class="nav-label">Sections</span>
-              <div class="nav-pills">
-                <span class="nav-pill is-active">Overview</span>
-                <span class="nav-pill">Devices</span>
-                <span class="nav-pill">Routers</span>
-                <span class="nav-pill">Safety</span>
+              <div class="nav-pills" role="tablist" aria-label="RouterFarm workspaces">
+                <button id="routersTabButton" class="nav-pill is-active" type="button" role="tab" aria-selected="true">Routers</button>
+                <button id="devicesTabButton" class="nav-pill" type="button" role="tab" aria-selected="false">Devices</button>
               </div>
             </div>
             <div class="nav-card">
@@ -65,7 +63,7 @@
               <p class="eyebrow">Native Desktop Control Room</p>
               <div class="brand-row">
                 <h1>RouterFarm</h1>
-                <span class="build-chip">Build 20260414a</span>
+                <span class="build-chip">Build v20260424</span>
               </div>
               <p class="subtitle">Desktop-native orchestration for routed Opals, USB-backed LinkPro uplinks, and session gating that rejects reused IPs, AP mode, or missing tethering before a phone is allowed to run.</p>
               <div class="hero-status-row">
@@ -129,7 +127,7 @@
                 <select id="roleFilter">
                   <option value="all">All roles</option>
                   <option value="sim-direct">SIM Direct</option>
-                  <option value="opal-client">Opal Client</option>
+                  <option value="router-linkpro">LinkPro Routed</option>
                   <option value="hotspot-client">Hotspot Client</option>
                 </select>
               </label>
@@ -164,9 +162,10 @@
             </div>
           </section>
 
-          <main class="dashboard-layout">
-            <section class="main-column">
-              <section class="panel rack-overview-panel">
+          <section id="routersWorkspace" class="dashboard-workspace is-active" aria-labelledby="routersTabButton">
+            <section class="dashboard-layout">
+              <section class="main-column">
+                <section class="panel rack-overview-panel">
                 <div class="panel-header">
                   <div>
                     <h2>Rack Overview</h2>
@@ -177,7 +176,7 @@
                 <div id="rackOverviewGrid" class="rack-overview-grid"></div>
               </section>
 
-              <section class="panel router-panel">
+                <section class="panel router-panel">
                 <div class="panel-header">
                   <div>
                     <h2>Opal Routers</h2>
@@ -186,46 +185,11 @@
                   <span id="routerCount" class="count-pill">0 routers</span>
                 </div>
                 <div id="routerGrid" class="router-grid"></div>
+                </section>
               </section>
 
-          <section class="panel devices-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Devices</h2>
-                <p class="panel-copy">Visible devices with Opal assignment, activation locks, prep timing, IP verification, and direct control actions.</p>
-              </div>
-              <span id="deviceCount" class="count-pill">0 devices</span>
-            </div>
-
-            <div id="cardView" class="device-grid"></div>
-
-            <div id="tableView" class="table-shell" hidden>
-              <table class="device-table">
-                <thead>
-                  <tr>
-                    <th>Device</th>
-                    <th>Serial</th>
-                    <th>Status</th>
-                    <th>Role</th>
-                    <th>Router</th>
-                    <th>Session</th>
-                    <th>Prep</th>
-                    <th>Progress</th>
-                    <th>Gmail</th>
-                    <th>Public IP</th>
-                    <th>Last Checked</th>
-                    <th>IP Warning</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="deviceTableBody"></tbody>
-              </table>
-            </div>
-          </section>
-            </section>
-
-            <aside class="side-column">
-              <section class="panel queue-panel">
+              <aside class="side-column">
+                <section class="panel queue-panel">
                 <div class="panel-header">
                   <div>
                     <h2>Queue</h2>
@@ -249,9 +213,9 @@
                   </div>
                 </div>
                 <div id="queueList" class="queue-list"></div>
-              </section>
+                </section>
 
-              <section class="panel activity-panel">
+                <section class="panel activity-panel">
                 <div class="panel-header">
                   <div>
                     <h2>Activity</h2>
@@ -259,9 +223,9 @@
                   </div>
                 </div>
                 <div id="activityList" class="activity-list"></div>
-              </section>
+                </section>
 
-              <section class="panel">
+                <section class="panel">
                 <div class="panel-header">
                   <div>
                     <h2>Routing Safety</h2>
@@ -272,9 +236,47 @@
                 <p id="routingSummary" class="panel-copy panel-copy-tight"></p>
                 <div id="routingPaths" class="routing-paths"></div>
                 <div id="routingChecks" class="activity-list"></div>
-              </section>
-            </aside>
-          </main>
+                </section>
+              </aside>
+            </section>
+          </section>
+
+          <section id="devicesWorkspace" class="dashboard-workspace" aria-labelledby="devicesTabButton" hidden>
+            <section class="panel devices-panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Devices</h2>
+                  <p class="panel-copy">SIM-direct phones stay separate from LinkPro-routed phones, with assignment, prep timing, IP verification, and direct control actions in one focused workspace.</p>
+                </div>
+                <span id="deviceCount" class="count-pill">0 devices</span>
+              </div>
+
+              <div id="cardView" class="device-grid"></div>
+
+              <div id="tableView" class="table-shell" hidden>
+                <table class="device-table">
+                  <thead>
+                    <tr>
+                      <th>Device</th>
+                      <th>Serial</th>
+                      <th>Status</th>
+                      <th>Role</th>
+                      <th>Router</th>
+                      <th>Session</th>
+                      <th>Prep</th>
+                      <th>Progress</th>
+                      <th>Gmail</th>
+                      <th>Public IP</th>
+                      <th>Last Checked</th>
+                      <th>IP Warning</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="deviceTableBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </section>
         </main>
       </div>
     </div>
@@ -396,7 +398,7 @@
             <span class="field-label">Role</span>
             <select id="editorRole">
               <option value="sim-direct">SIM Direct</option>
-              <option value="opal-client">Opal Client</option>
+              <option value="router-linkpro">LinkPro Routed</option>
               <option value="hotspot-client">Hotspot Client</option>
             </select>
           </label>
@@ -420,6 +422,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=20260414a"></script>
+    <script src="app.js?v=v20260424"></script>
   </body>
 </html>

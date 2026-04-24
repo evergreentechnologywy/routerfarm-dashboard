@@ -308,22 +308,15 @@ if ($deviceState.ExitCode -ne 0 -or $deviceState.State -eq "offline" -or $device
 }
 
 $networkReadiness = Get-NetworkReadiness -Serial $Serial
+$networkRouteFailure = ""
 if (-not $networkReadiness.HasRoute -and -not $networkReadiness.NetworkReachable) {
-  $reason = if ($networkReadiness.SimAbsent) {
+  $networkRouteFailure = if ($networkReadiness.SimAbsent) {
     "No SIM card is present and the phone has no usable network route."
   } elseif ($networkReadiness.SimState) {
     "Phone has no usable network route. SIM state: $($networkReadiness.SimState)."
   } else {
     "Phone has no usable network route."
   }
-
-  [pscustomobject]@{
-    success = $false
-    ip = ""
-    source = ""
-    error = $reason
-  } | ConvertTo-Json -Compress
-  exit 1
 }
 
 $helperResult = Get-PublicIpFromHelper -Serial $Serial
@@ -339,6 +332,8 @@ if (-not $helperResult.missingHelper) {
   } else {
     "RouterFarm IP Helper failed to return a public IP."
   }
+} elseif ($networkRouteFailure) {
+  $failure = $networkRouteFailure
 }
 
 $attempts = @(

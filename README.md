@@ -16,7 +16,6 @@ This branch is the first Opal-focused foundation, not the finished production bu
 
 Implemented in this fork:
 
-- separate local fork at `C:\RouterFarm`
 - renamed desktop/package identity to `RouterFarm`
 - new `config/routers.json` with 15 Opal router records
 - device model extended with `routerId` and `routerSlot`
@@ -44,15 +43,15 @@ Still intentionally incomplete:
 
 ## Folder Layout
 
-- `C:\RouterFarm\config\settings.json`
-- `C:\RouterFarm\config\devices.json`
-- `C:\RouterFarm\config\routers.json`
-- `C:\RouterFarm\config\state.json`
-- `C:\RouterFarm\scripts\invoke-routerfarm-router-action.ps1`
-- `C:\RouterFarm\scripts\connect-phone-to-router.ps1`
-- `C:\RouterFarm\scripts\cycle-mobile-uplink.ps1`
-- `C:\RouterFarm\web\`
-- `C:\RouterFarm\electron\`
+- `config/settings.json`
+- `config/devices.json`
+- `config/routers.json`
+- `config/state.json`
+- `scripts/invoke-routerfarm-router-action.ps1`
+- `scripts/connect-phone-to-router.ps1`
+- `scripts/cycle-mobile-uplink.ps1`
+- `web/`
+- `electron/`
 
 ## Config Model
 
@@ -146,21 +145,19 @@ For IP reset by power cycling the mobile USB router, this fork currently stops a
 ## Start
 
 ```powershell
-cd C:\RouterFarm
 npm start
 ```
 
 Desktop shell:
 
 ```powershell
-cd C:\RouterFarm
 npm run start:desktop
 ```
 
 Seed router assignments automatically:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File C:\RouterFarm\scripts\seed-routerfarm-assignments.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\seed-routerfarm-assignments.ps1
 ```
 
 ## Next implementation priorities

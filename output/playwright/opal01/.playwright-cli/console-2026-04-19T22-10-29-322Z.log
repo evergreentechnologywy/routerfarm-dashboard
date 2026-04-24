@@ -1,0 +1,2 @@
+[   32209ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/views/gl-sdk4-ui-internet.common.js?1776636661526:0
+[   32235ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/views/gl-sdk4-ui-home.common.js?1776636661526:0

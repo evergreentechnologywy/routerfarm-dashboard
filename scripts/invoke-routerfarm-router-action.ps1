@@ -201,18 +201,24 @@ $commandMap = @{
 sh -c '
 get_public_ip() {
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL https://api.ipify.org 2>/dev/null || true
+    curl -fsSL --connect-timeout 5 --max-time 8 https://api.ipify.org 2>/dev/null || true
   elif command -v uclient-fetch >/dev/null 2>&1; then
     uclient-fetch -qO- https://api.ipify.org 2>/dev/null || true
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO- https://api.ipify.org 2>/dev/null || true
+    wget -T 8 -qO- https://api.ipify.org 2>/dev/null || true
   fi
 }
 tether_json="$(ifstatus tethering 2>/dev/null || true)"
 iface="$(printf "%s" "$tether_json" | jsonfilter -e "@.l3_device" 2>/dev/null || true)"
 [ -n "$iface" ] || iface="$(printf "%s" "$tether_json" | jsonfilter -e "@.device" 2>/dev/null || true)"
+model="$(cat /proc/gl-hw-info/model 2>/dev/null || true)"
 before_ip="$(get_public_ip)"
-if [ -n "$iface" ] && [ -e "/sys/class/net/$iface/device/driver/unbind" ]; then
+if [ "$model" = "sft1200" ]; then
+  ifdown tethering >/dev/null 2>&1 || true
+  sleep 4
+  ifup tethering >/dev/null 2>&1 || true
+  sleep 6
+elif [ -n "$iface" ] && [ -e "/sys/class/net/$iface/device/driver/unbind" ]; then
   devnode="$(basename "$(readlink -f "/sys/class/net/$iface/device")")"
   drvpath="$(readlink -f "/sys/class/net/$iface/device/driver")"
   printf "%s" "$devnode" > "$drvpath/unbind"
@@ -248,7 +254,7 @@ $telemetryCommands = @{
   "wwan" = "ifstatus wwan"
   "route" = "ip route"
   "networkConfig" = "cat /etc/config/network"
-  "publicIp" = "sh -c 'if command -v curl >/dev/null 2>&1; then curl -fsSL https://api.ipify.org; elif command -v uclient-fetch >/dev/null 2>&1; then uclient-fetch -qO- https://api.ipify.org; elif command -v wget >/dev/null 2>&1; then wget -qO- https://api.ipify.org; else echo no-http-client; fi'"
+  "publicIp" = "sh -c 'if command -v curl >/dev/null 2>&1; then curl -fsSL --connect-timeout 5 --max-time 8 https://api.ipify.org; elif command -v uclient-fetch >/dev/null 2>&1; then uclient-fetch -qO- https://api.ipify.org; elif command -v wget >/dev/null 2>&1; then wget -T 8 -qO- https://api.ipify.org; else echo no-http-client; fi'"
   "usbDevices" = "cat /sys/kernel/debug/usb/devices 2>/dev/null"
   "usbPorts" = "cat /proc/gl-hw-info/usb-port 2>/dev/null"
 }
@@ -316,6 +322,9 @@ if ($Action -eq "router-health") {
   $tetheringState = "unknown"
   $tetheringError = ""
   $tetheringHint = ""
+  $tetheringDevice = ""
+  $tetheringAddress = ""
+  $tetheringInUse = $false
   if ($tetheringJson -and $tetheringJson.err_code -eq -2) {
     $tetheringState = "no-device"
     $tetheringError = [string]$tetheringJson.err_msg
@@ -323,8 +332,41 @@ if ($Action -eq "router-health") {
   } elseif ($tetheringJson -and $tetheringJson.err_msg) {
     $tetheringState = "error"
     $tetheringError = [string]$tetheringJson.err_msg
-  } elseif ($tetheringJson -and (($tetheringJson.device) -or (@($tetheringJson.devices).Count -gt 0))) {
-    $tetheringState = "detected"
+  } elseif ($tetheringJson) {
+    if ($tetheringJson.device) {
+      $tetheringDevice = [string]$tetheringJson.device
+    } elseif ($tetheringJson.l3_device) {
+      $tetheringDevice = [string]$tetheringJson.l3_device
+    } elseif (@($tetheringJson.devices).Count -gt 0) {
+      $primaryTetherDevice = @($tetheringJson.devices) | Select-Object -First 1
+      if ($primaryTetherDevice -and $primaryTetherDevice.device) {
+        $tetheringDevice = [string]$primaryTetherDevice.device
+      }
+    }
+
+    $tetheringIpv4 = $tetheringJson.ipv4
+    if (-not $tetheringIpv4) {
+      $tetheringIpv4 = @($tetheringJson."ipv4-address")[0]
+    }
+    if ($tetheringIpv4) {
+      if ($tetheringIpv4.ip) {
+        $tetheringAddress = [string]$tetheringIpv4.ip
+      } elseif ($tetheringIpv4.address) {
+        $tetheringAddress = [string]$tetheringIpv4.address
+      }
+    }
+
+    $tetheringInUse = [bool](
+      ($tetheringJson.status -eq 1) -or
+      ($tetheringJson.up -eq $true) -or
+      ((@($tetheringJson.devices) | Where-Object { $_.use -eq $true }).Count -gt 0)
+    )
+
+    if ($tetheringInUse) {
+      $tetheringState = "connected"
+    } elseif (($tetheringJson.device) -or (@($tetheringJson.devices).Count -gt 0)) {
+      $tetheringState = "detected"
+    }
   }
 
   $wanUp = $false
@@ -354,6 +396,13 @@ if ($Action -eq "router-health") {
     $uplinkInterface = "wan"
     $uplinkMode = "router-uplink"
     $uplinkRaw = $wanResult.Output
+  } elseif ($tetheringInUse) {
+    $wanUp = $true
+    $wanDevice = $tetheringDevice
+    $wanAddress = $tetheringAddress
+    $uplinkInterface = if ($tetheringDevice) { $tetheringDevice } else { "tethering" }
+    $uplinkMode = "router-uplink"
+    $uplinkRaw = $tetheringResult.Output
   } else {
     $uplinkInterface = "lan"
     $uplinkMode = "bridge-or-ap"

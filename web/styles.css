@@ -240,18 +240,29 @@ select {
 .nav-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 34px;
   padding: 0 12px;
+  border: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.74);
   font-size: 0.78rem;
   font-weight: 700;
+  cursor: pointer;
 }
 
 .nav-pill.is-active {
   background: linear-gradient(180deg, #ff8a57, #e05a28);
   color: #fff;
+}
+
+.dashboard-workspace {
+  display: none;
+}
+
+.dashboard-workspace.is-active {
+  display: block;
 }
 
 .nav-actions {

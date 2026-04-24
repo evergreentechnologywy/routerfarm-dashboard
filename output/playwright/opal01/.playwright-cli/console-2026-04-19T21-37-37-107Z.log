@@ -1,0 +1,7 @@
+[    1021ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://192.168.8.1/fonts/iconfont.a0bf2071.woff2:0
+[    1045ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://192.168.8.1/fonts/iconfont.39e3ed67.woff:0
+[    1071ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://192.168.8.1/fonts/iconfont.2d7d2f03.ttf:0
+[   76736ms] TypeError: this.$getHash is not a function
+    at eval (eval at <anonymous> (http://192.168.8.1/js/app.7ec6347c.js:53:29865), <anonymous>:7:26149)
+[  144411ms] TypeError: this.$getHash is not a function
+    at eval (eval at <anonymous> (http://192.168.8.1/js/app.7ec6347c.js:53:29865), <anonymous>:7:26149)

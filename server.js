@@ -5,6 +5,12 @@ const crypto = require("crypto");
 const net = require("net");
 const { spawn, spawnSync } = require("child_process");
 const { URL } = require("url");
+const {
+  buildRouterOccupancyLock,
+  deviceLooksOnRouterWifi,
+  isUsablePublicIp,
+  mergePublicIpLocation
+} = require("./lib/routerfarm-routing");
 
 const ROOT = __dirname;
 const CONFIG_DIR = path.join(ROOT, "config");
@@ -23,7 +29,7 @@ const IP_CHECK_LOG_PATH = path.join(LOG_DIR, "ip-check.log");
 const PID_PATH = path.join(ROOT, "routerfarm.pid");
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const ROUTERFARM_REMOTE_PREFIX = "/routerfarm";
-const AUTH_DISABLED = true;
+const AUTH_DISABLED = process.env.ROUTERFARM_AUTH_DISABLED === "true" || settings.authDisabled || false;
 const AUTH_BYPASS_USER = {
   username: "operator",
   displayName: "Operator",
@@ -40,9 +46,9 @@ const DEFAULT_SETTINGS = {
   ipRefreshIntervalMs: 15000,
   routerRefreshIntervalMs: 20000,
   topology: {
-    targetRouters: 15,
+    targetRouters: 5,
     targetPhones: 60,
-    phonesPerRouter: 4,
+    phonesPerRouter: 2,
     routerSwitchPorts: 16
   },
   deviceRefresh: {
@@ -264,6 +270,15 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+server.on("error", error => {
+  if (error.code === "EADDRINUSE") {
+    logActivity("system", `Port ${settings.port} is already in use. Process exiting.`);
+  } else {
+    logActivity("system", `Server error: ${error.message}`);
+  }
+  process.exit(1);
+});
+
 server.listen(settings.port, settings.host, () => {
   logActivity("system", `Dashboard listening on http://${settings.host}:${settings.port}`);
   setTimeout(() => {
@@ -473,7 +488,9 @@ function filterRecentActivityForUser(user) {
 }
 
 function getAssignedDevicesForRouter(routerId) {
-  return Object.values(deviceCache).filter(device => String(device.routerId || "") === String(routerId || ""));
+  return (devicesConfig.devices || [])
+    .map(device => getDeviceConfig(device.serial))
+    .filter(device => deviceUsesRouterAssignment(device) && String(device.routerId || "") === String(routerId || ""));
 }
 
 function getActiveSession() {
@@ -530,6 +547,7 @@ function buildRouterStatuses(visibleDevices) {
       .sort((a, b) => (a.routerSlot || 99) - (b.routerSlot || 99) || String(a.nickname || a.serial).localeCompare(String(b.nickname || b.serial)));
     const activeDevice = assigned.find(device => device.sessionState === "running") || null;
     const routerState = state.routers?.[router.id] || {};
+    const maxAssignedDevices = Number(router.maxAssignedDevices) || getPhonesPerRouterTarget();
     return {
       id: router.id,
       label: router.label || router.id,
@@ -538,11 +556,11 @@ function buildRouterStatuses(visibleDevices) {
       lanSubnet: router.lanSubnet || "",
       mobileUplinkId: router.mobileUplinkId || "",
       enabled: router.enabled !== false,
-      maxAssignedDevices: Number(router.maxAssignedDevices) || 4,
+      maxAssignedDevices,
       maxConcurrentDevices: Number(router.maxConcurrentDevices) || 1,
       assignedDeviceCount: assigned.length,
-      capacityRemaining: Math.max((Number(router.maxAssignedDevices) || 4) - assigned.length, 0),
-      overAssigned: assigned.length > (Number(router.maxAssignedDevices) || 4),
+      capacityRemaining: Math.max(maxAssignedDevices - assigned.length, 0),
+      overAssigned: assigned.length > maxAssignedDevices,
       activeDeviceSerial: activeDevice?.serial || "",
       activeDeviceLabel: activeDevice ? formatDeviceLabel(activeDevice) : "",
       slotUsage: assigned.map(device => ({
@@ -578,14 +596,24 @@ function buildRouterStatuses(visibleDevices) {
 }
 
 function getDeviceConfig(serial) {
-  return (devicesConfig.devices || []).find(device => device.serial === serial) || {
-    serial,
-    phoneNumber: null,
-    nickname: "",
-    role: "sim-direct",
-    parentHotspotSerial: "",
-    routerId: "",
-    routerSlot: null
+  const record = (devicesConfig.devices || []).find(device => device.serial === serial);
+  if (!record) {
+    return {
+      serial,
+      phoneNumber: null,
+      nickname: "",
+      role: "sim-direct",
+      parentHotspotSerial: "",
+      routerId: "",
+      routerSlot: null
+    };
+  }
+  const normalizedRole = normalizeDeviceRole(record.role);
+  return {
+    ...record,
+    role: normalizedRole,
+    routerId: deviceUsesRouterAssignment({ role: normalizedRole }) ? String(record.routerId || "") : "",
+    routerSlot: deviceUsesRouterAssignment({ role: normalizedRole }) ? parsePositiveIntegerOrNull(record.routerSlot) : null
   };
 }
 
@@ -594,7 +622,7 @@ function upsertDeviceConfig(serial, patch) {
   const index = devices.findIndex(device => device.serial === serial);
   const nextRecord = {
     ...getDeviceConfig(serial),
-    ...patch,
+    ...sanitizeDeviceMetadataPatch(patch),
     serial
   };
   if (index >= 0) {
@@ -657,6 +685,50 @@ function parsePositiveIntegerOrNull(value) {
   return parsed;
 }
 
+function normalizeDeviceRole(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (!normalized || normalized === "sim-direct") {
+    return "sim-direct";
+  }
+  if (["router-client", "opal-client", "router-linkpro", "linkpro-routed"].includes(normalized)) {
+    return "router-linkpro";
+  }
+  if (normalized === "hotspot-client") {
+    return "hotspot-client";
+  }
+  if (normalized === "hotspot-provider") {
+    return "hotspot-provider";
+  }
+  return normalized;
+}
+
+function deviceRequiresRouter(device) {
+  return normalizeDeviceRole(device?.role) === "router-linkpro";
+}
+
+function deviceUsesRouterAssignment(device) {
+  return deviceRequiresRouter(device) || normalizeDeviceRole(device?.role) === "hotspot-client";
+}
+
+function getPhonesPerRouterTarget() {
+  return Math.max(1, Number(settings.topology?.phonesPerRouter) || Number(DEFAULT_SETTINGS.topology.phonesPerRouter) || 2);
+}
+
+function sanitizeDeviceMetadataPatch(patch = {}) {
+  const hasRole = Object.prototype.hasOwnProperty.call(patch, "role");
+  const nextPatch = {
+    ...patch
+  };
+  if (hasRole) {
+    nextPatch.role = normalizeDeviceRole(patch.role);
+  }
+  if (hasRole && !deviceUsesRouterAssignment({ role: nextPatch.role })) {
+    nextPatch.routerId = "";
+    nextPatch.routerSlot = null;
+  }
+  return nextPatch;
+}
+
 function ensureDeviceNumberAssignment(serial) {
   const existing = getDeviceConfig(serial);
   const currentNumber = Number(existing.phoneNumber);
@@ -678,6 +750,9 @@ function getRouterAssignmentSummary() {
     summary.set(router.id, []);
   }
   for (const device of devicesConfig.devices || []) {
+    if (!deviceUsesRouterAssignment(device)) {
+      continue;
+    }
     const routerId = String(device.routerId || "");
     if (!routerId || !summary.has(routerId)) {
       continue;
@@ -689,6 +764,9 @@ function getRouterAssignmentSummary() {
 
 function assignPersistentRouterToDevice(serial) {
   const existing = getDeviceConfig(serial);
+  if (!deviceRequiresRouter(existing)) {
+    return existing;
+  }
   if (existing.routerId) {
     return existing;
   }
@@ -706,7 +784,7 @@ function assignPersistentRouterToDevice(serial) {
 
   for (const router of routers) {
     const assignedDevices = assignments.get(router.id) || [];
-    const maxAssigned = Number(router.maxAssignedDevices) || 4;
+    const maxAssigned = Number(router.maxAssignedDevices) || getPhonesPerRouterTarget();
     if (assignedDevices.length >= maxAssigned) {
       continue;
     }
@@ -731,7 +809,7 @@ function assignPersistentRouterToDevice(serial) {
   }
 
   const patched = upsertDeviceConfig(serial, {
-    role: existing.role === "sim-direct" ? "router-client" : existing.role,
+    role: normalizeDeviceRole(existing.role),
     routerId: selectedRouter.id,
     routerSlot: selectedSlot
   });
@@ -940,13 +1018,16 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     const nextRouterId = String(body.routerId || "").trim();
     const nextRouterSlot = parsePositiveIntegerOrNull(body.routerSlot);
     const nextPhoneNumber = parsePositiveIntegerOrNull(body.phoneNumber);
+    const currentConfig = getDeviceConfig(serial);
     upsertDeviceConfig(serial, {
-      nickname: String(body.nickname || "").trim(),
-      phoneNumber: nextPhoneNumber,
-      role: String(body.role || "sim-direct").trim() || "sim-direct",
-      parentHotspotSerial: String(body.parentHotspotSerial || "").trim(),
-      routerId: nextRouterId,
-      routerSlot: nextRouterSlot
+      nickname: Object.prototype.hasOwnProperty.call(body, "nickname") ? String(body.nickname || "").trim() : currentConfig.nickname,
+      phoneNumber: Object.prototype.hasOwnProperty.call(body, "phoneNumber") ? nextPhoneNumber : currentConfig.phoneNumber,
+      role: Object.prototype.hasOwnProperty.call(body, "role") ? body.role : currentConfig.role,
+      parentHotspotSerial: Object.prototype.hasOwnProperty.call(body, "parentHotspotSerial")
+        ? String(body.parentHotspotSerial || "").trim()
+        : currentConfig.parentHotspotSerial,
+      routerId: Object.prototype.hasOwnProperty.call(body, "routerId") ? nextRouterId : currentConfig.routerId,
+      routerSlot: Object.prototype.hasOwnProperty.call(body, "routerSlot") ? nextRouterSlot : currentConfig.routerSlot
     });
     refreshDevices();
     logActivity("metadata", `Device metadata updated by ${user.username}`, serial);
@@ -1003,12 +1084,27 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
       { detached: false }
     );
 
-    child.on("exit", code => {
-      const success = code === 0;
-      updateDeviceState(serial, {
-        prepMessage: success ? "Airplane mode cleared and radios recovered" : "Radio recovery failed; review logs"
+    let stdout = "";
+    if (child.stdout) {
+      child.stdout.on("data", chunk => {
+        stdout += chunk.toString();
       });
-      logActivity("recover", success ? "Radio recovery completed" : `Radio recovery failed with exit code ${code}`, serial);
+    }
+
+    child.on("exit", code => {
+      const payload = parseJsonPayload(stdout);
+      const success = code === 0 && payload?.ok;
+      let message = success ? "Airplane mode cleared and radios recovered" : "Radio recovery failed; review logs";
+      if (payload && !success && payload.error) {
+        message = `Radio recovery failed: ${payload.error}`;
+      } else if (payload && success && payload.airplaneModeOff === false) {
+        message = "Radios recovered, but airplane mode might still be on (verify manually)";
+      }
+
+      updateDeviceState(serial, {
+        prepMessage: message
+      });
+      logActivity("recover", success ? "Radio recovery completed" : `Radio recovery failed: ${payload?.error || `exit code ${code}`}`, serial);
     });
 
     logActivity("recover", `Radio recovery requested by ${user.username}`, serial);
@@ -1039,37 +1135,48 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     if (routingGuard.blocked) {
       return sendJson(res, 409, { error: `Session start blocked: ${routingGuard.reasons.join(" | ")}`, routingGuard });
     }
+    const routedSession = deviceRequiresRouter(knownDevice);
     const activationLock = buildActivationLock(knownDevice);
     if (!activationLock.allowed) {
       return sendJson(res, 409, { error: activationLock.reason, activationLock });
     }
-    const restartGate = await enforceRouterRestartBeforeSession(serial, user, knownDevice);
-    if (!restartGate.ok) {
-      return sendJson(res, 409, { error: restartGate.error || "Router restart gate failed", detail: restartGate.detail || null });
-    }
-    const refreshedDevice = deviceCache[serial] || buildMissingDevice(serial);
-    if (!deviceLooksOnRouterWifi(refreshedDevice)) {
+    if (routedSession) {
       await setDeviceWifiStateAsync(serial, false);
       updateDeviceState(serial, {
-        prepMessage: `Phone did not land on router Wi-Fi after reconnect; current interface is ${refreshedDevice.network?.interface || "unknown"}`
+        prepMessage: "Wi-Fi disabled while RouterFarm rotates this phone onto a fresh routed IP"
       });
-      return sendJson(res, 409, {
-        error: `Session start blocked: phone is not using router Wi-Fi after reconnect. Current interface: ${refreshedDevice.network?.interface || "unknown"}.`
-      });
-    }
-    const verification = await runDevicePublicIpCheck(serial, "pre-session");
-    if (!verification.success) {
-      await setDeviceWifiStateAsync(serial, false);
-      updateDeviceState(serial, { prepMessage: "IP verification failed and Wi-Fi was disabled" });
-      return sendJson(res, 409, { error: verification.error || "IP verification failed; session not started" });
-    }
-    if (verification.publicIp?.reusePolicyViolation && getIpReusePolicy().blockSessionStartOnReuse) {
-      const routerLabel = knownDevice.routerLabel || knownDevice.routerId || "assigned router";
-      await setDeviceWifiStateAsync(serial, false);
-      updateDeviceState(serial, { prepMessage: "Reused IP detected; Wi-Fi was disabled pending a new attempt" });
-      return sendJson(res, 409, {
-        error: `Session start blocked: ${verification.publicIp.currentIp} was already used within the last ${verification.publicIp.reusePolicyWindowHours} hours. Reset ${routerLabel} and verify a fresh IP before starting.`,
-        ipCheck: verification.publicIp
+      const restartGate = await enforceRouterRestartBeforeSession(serial, user, knownDevice);
+      if (!restartGate.ok) {
+        return sendJson(res, 409, { error: restartGate.error || "Router restart gate failed", detail: restartGate.detail || null });
+      }
+      await refreshDevices();
+      const refreshedDevice = deviceCache[serial] || buildMissingDevice(serial);
+      if (!deviceLooksOnRouterWifi(refreshedDevice)) {
+        await setDeviceWifiStateAsync(serial, false);
+        updateDeviceState(serial, {
+          prepMessage: `Phone did not land on router Wi-Fi after reconnect; current interface is ${refreshedDevice.network?.interface || "unknown"}`
+        });
+        return sendJson(res, 409, {
+          error: `Session start blocked: phone is not using router Wi-Fi after reconnect. Current interface: ${refreshedDevice.network?.interface || "unknown"}.`
+        });
+      }
+      const verification = await runDevicePublicIpCheck(serial, "pre-session");
+      if (!verification.success) {
+        await setDeviceWifiStateAsync(serial, false);
+        updateDeviceState(serial, { prepMessage: "IP verification failed and Wi-Fi was disabled" });
+        return sendJson(res, 409, { error: verification.error || "IP verification failed; session not started" });
+      }
+      if (verification.publicIp?.reusePolicyViolation && getIpReusePolicy().blockSessionStartOnReuse) {
+        const routerLabel = knownDevice.routerLabel || knownDevice.routerId || "assigned router";
+        await setDeviceWifiStateAsync(serial, false);
+        updateDeviceState(serial, { prepMessage: "Reused IP detected; Wi-Fi was disabled pending a new attempt" });
+        return sendJson(res, 409, {
+          error: `Session start blocked: ${verification.publicIp.currentIp} was already used within the last ${verification.publicIp.reusePolicyWindowHours} hours. Reset ${routerLabel} and verify a fresh IP before starting.`,
+          ipCheck: verification.publicIp
+        });
+      }
+      updateDeviceState(serial, {
+        prepMessage: `Fresh routed IP ${verification.publicIp?.currentIp || ""} verified; launching control session`
       });
     }
     if (body && body.skipViewerLaunch) {
@@ -1094,8 +1201,12 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     }
     runPowerShellScript("stop-scrcpy-for-device.ps1", stopArgs, { detached: true, windowsHide: false });
     updateDeviceState(serial, { sessionState: "stopped", sessionStoppedAt: new Date().toISOString() });
-    await setDeviceWifiStateAsync(serial, false);
-    updateDeviceState(serial, { prepMessage: "Session stopped and Wi-Fi disabled" });
+    if (deviceRequiresRouter(knownDevice)) {
+      await setDeviceWifiStateAsync(serial, false);
+      updateDeviceState(serial, { prepMessage: "Session stopped and Wi-Fi disabled" });
+    } else {
+      updateDeviceState(serial, { prepMessage: "Session stopped" });
+    }
     logActivity("session", `Session stopped by ${user.username} and scrcpy close requested`, serial);
     return sendJson(res, 200, { ok: true });
   }
@@ -1105,21 +1216,42 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     if (!router) {
       return sendJson(res, 409, { error: "Assign this phone to a router before connecting." });
     }
-    const connectResult = await connectPhoneToRouterAsync(serial, router);
-    if (!connectResult.ok) {
-      const errorMessage = connectResult.error || "Phone-to-router connect failed.";
-      updateDeviceState(serial, { prepMessage: errorMessage });
-      logActivity("router-connect", `Phone-to-router connect failed: ${errorMessage}`, serial);
-      return sendJson(res, 500, { error: errorMessage, detail: connectResult.payload || null });
+
+    await setDeviceWifiStateAsync(serial, false);
+    updateDeviceState(serial, {
+      prepMessage: `Cycling ${router.label || router.id} to obtain a fresh IP before Wi-Fi join`
+    });
+
+    const restartGate = await enforceRouterRestartBeforeSession(serial, user, knownDevice);
+    if (!restartGate.ok) {
+      return sendJson(res, 409, { error: restartGate.error || "Router fresh-IP gate failed", detail: restartGate.detail || null });
+    }
+
+    const verification = await runDevicePublicIpCheck(serial, "router-connect");
+    if (!verification.success) {
+      await setDeviceWifiStateAsync(serial, false);
+      updateDeviceState(serial, { prepMessage: "Phone-side IP verification failed and Wi-Fi was disabled" });
+      return sendJson(res, 409, { error: verification.error || "Phone-side IP verification failed", detail: verification.publicIp || null });
+    }
+    if (verification.publicIp?.reusePolicyViolation && getIpReusePolicy().blockSessionStartOnReuse) {
+      await setDeviceWifiStateAsync(serial, false);
+      updateDeviceState(serial, { prepMessage: "Reused IP detected after router join; Wi-Fi was disabled" });
+      return sendJson(res, 409, {
+        error: `Router join blocked: ${verification.publicIp.currentIp} was already used within the last ${verification.publicIp.reusePolicyWindowHours} hours.`,
+        detail: verification.publicIp
+      });
     }
 
     updateDeviceState(serial, {
-      prepMessage: connectResult.payload?.message || `Router Wi-Fi connect requested for ${router.label || router.id}`
+      prepMessage: `Connected to ${router.label || router.id} with fresh IP ${verification.publicIp?.currentIp || restartGate.routerPublicIp || ""}`
     });
-    logActivity("router-connect", connectResult.manualAssist
-      ? `Phone-to-router connect requires manual completion for ${router.label || router.id}`
-      : `Phone-to-router connect requested by ${user.username} for ${router.label || router.id}`, serial);
-    return sendJson(res, 200, { ok: true, manualAssist: connectResult.manualAssist, detail: connectResult.payload });
+    logActivity("router-connect", `Phone connected to ${router.label || router.id} by ${user.username} after fresh IP verification`, serial);
+    return sendJson(res, 200, {
+      ok: true,
+      detail: restartGate.reconnectResult?.payload || null,
+      ipCheck: verification.publicIp,
+      routerPublicIp: restartGate.routerPublicIp || ""
+    });
   }
 
   if (action === "reset-uplink-ip") {
@@ -1331,7 +1463,7 @@ function connectPhoneToRouter(serial, router) {
     cwd: ROOT,
     encoding: "utf8",
     windowsHide: true,
-    timeout: 45000
+    timeout: 120000
   });
 
   const payload = parseJsonPayload(script.stdout);
@@ -1363,7 +1495,7 @@ async function connectPhoneToRouterAsync(serial, router) {
   ], {
     cwd: ROOT,
     windowsHide: true,
-    timeoutMs: 45000
+    timeoutMs: 120000
   });
 
   const payload = parseJsonPayload(script.stdout);
@@ -1419,95 +1551,127 @@ async function setDeviceWifiStateAsync(serial, enabled) {
 
 async function enforceRouterRestartBeforeSession(serial, user, device) {
   const policy = settings.sessionPolicy || DEFAULT_SETTINGS.sessionPolicy;
-  if (!policy.restartRouterBeforeSession) {
-    return { ok: true, skipped: true };
-  }
-
   const router = device.routerId ? getRouterConfig(device.routerId) : null;
   if (!router) {
     return { ok: false, error: "Assign this phone to a router before starting a session." };
   }
 
-  updateDeviceState(serial, {
-    prepMessage: `Checking ${router.label || router.id} before session start`
-  });
-  const healthResult = await executeRouterActionAsync(router.id, "router-health", {});
-  if (!healthResult.ok) {
+  const occupancyLock = buildRouterOccupancyLock(Object.values(deviceCache || {}), device);
+  if (!occupancyLock.allowed) {
+    updateDeviceState(serial, { prepMessage: occupancyLock.reason });
+    return { ok: false, error: occupancyLock.reason };
+  }
+
+  if (!policy.restartRouterBeforeSession) {
+    return { ok: true, skipped: true };
+  }
+
+  let lastError = "";
+  let lastDetail = null;
+  let previousRouterIp = isUsablePublicIp(state.routers?.[router.id]?.publicIp)
+    ? String(state.routers[router.id].publicIp).trim()
+    : "";
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
     updateDeviceState(serial, {
-      prepMessage: healthResult.error || `Router health check failed for ${router.label || router.id}`
+      prepMessage: `Attempt ${attempt}/3: checking ${router.label || router.id} before LinkPro cycle`
     });
-    return { ok: false, error: healthResult.error || "Router health check failed", detail: healthResult.payload || null };
-  }
+    const healthResult = await executeRouterActionAsync(router.id, "router-health", {});
+    if (!healthResult.ok) {
+      lastError = healthResult.error || `Router health check failed for ${router.label || router.id}`;
+      lastDetail = healthResult.payload || null;
+      continue;
+    }
 
-  const routerState = state.routers?.[router.id] || {};
-  const topologyGate = getRouterTopologyGate(router, routerState);
-  if (!topologyGate.ok) {
-    updateDeviceState(serial, { prepMessage: topologyGate.error });
-    return { ok: false, error: topologyGate.error, detail: topologyGate.detail || null };
-  }
+    const routerStateBeforeCycle = state.routers?.[router.id] || {};
+    if (!previousRouterIp && isUsablePublicIp(routerStateBeforeCycle.publicIp)) {
+      previousRouterIp = String(routerStateBeforeCycle.publicIp).trim();
+    }
 
-  const canCycleUsbUplink = String(routerState.routerMode || "").toLowerCase() === "router"
-    && String(routerState.tetheringState || "").toLowerCase() !== "no-device";
-  const routerAction = canCycleUsbUplink ? "cycle-uplink" : "reboot-router";
-  updateDeviceState(serial, {
-    prepMessage: canCycleUsbUplink
-      ? `Cycling LinkPro uplink on ${router.label || router.id} before session start`
-      : `Restarting ${router.label || router.id} before session start`
-  });
-  const restartResult = await executeRouterActionAsync(router.id, routerAction, {});
-  if (!restartResult.ok) {
     updateDeviceState(serial, {
-      prepMessage: restartResult.error || `${canCycleUsbUplink ? "Uplink cycle" : "Router restart"} failed for ${router.label || router.id}`
+      prepMessage: `Attempt ${attempt}/3: cycling LinkPro uplink on ${router.label || router.id}`
+    });
+    const cycleResult = await executeRouterActionAsync(router.id, "cycle-uplink", {});
+    if (!cycleResult.ok) {
+      lastError = cycleResult.error || `LinkPro cycle failed for ${router.label || router.id}`;
+      lastDetail = cycleResult.payload || null;
+      continue;
+    }
+
+    logActivity("uplink", `${router.label || router.id} LinkPro uplink cycled automatically by ${user.username} (attempt ${attempt}/3)`, serial);
+    await delay(Number(policy.reconnectWaitMs) || 8000);
+
+    const postCycleHealth = await executeRouterActionAsync(router.id, "router-health", {});
+    if (!postCycleHealth.ok) {
+      lastError = postCycleHealth.error || `Router health check after LinkPro cycle failed for ${router.label || router.id}`;
+      lastDetail = postCycleHealth.payload || null;
+      continue;
+    }
+
+    const routerStateAfterCycle = state.routers?.[router.id] || {};
+    const topologyGate = getRouterTopologyGate(router, routerStateAfterCycle);
+    if (!topologyGate.ok) {
+      lastError = topologyGate.error;
+      lastDetail = topologyGate.detail || null;
+      continue;
+    }
+
+    const nextRouterIp = isUsablePublicIp(routerStateAfterCycle.publicIp)
+      ? String(routerStateAfterCycle.publicIp).trim()
+      : "";
+    if (!nextRouterIp) {
+      lastError = `${router.label || router.id} did not report a usable public IP after the LinkPro cycle.`;
+      continue;
+    }
+    if (previousRouterIp && nextRouterIp === previousRouterIp) {
+      lastError = `${router.label || router.id} kept the same public IP ${nextRouterIp} after the LinkPro cycle.`;
+      previousRouterIp = nextRouterIp;
+      continue;
+    }
+
+    updateDeviceState(serial, {
+      prepMessage: `Attempt ${attempt}/3: joining ${router.label || router.id} after fresh router IP ${nextRouterIp}`
+    });
+    const connectResult = await connectPhoneToRouterAsync(serial, router);
+    if (!connectResult.ok) {
+      lastError = connectResult.error || `Phone-to-router reconnect failed for ${router.label || router.id}`;
+      lastDetail = connectResult.payload || null;
+      await setDeviceWifiStateAsync(serial, false);
+      continue;
+    }
+
+    logActivity("router-connect", `Phone connected to ${router.label || router.id} after automatic LinkPro cycle`, serial);
+    await delay(Number(policy.reconnectWaitMs) || 8000);
+    await refreshDevices();
+
+    const refreshedDevice = deviceCache[serial] || buildMissingDevice(serial);
+    const connectedSsid = String(connectResult.payload?.connectedSsid || "");
+    if (!deviceLooksOnRouterWifi(refreshedDevice) && connectedSsid !== String(router.ssid || "")) {
+      lastError = `Phone did not verify on router Wi-Fi after joining ${router.label || router.id}.`;
+      await setDeviceWifiStateAsync(serial, false);
+      continue;
+    }
+
+    updateDeviceState(serial, {
+      prepMessage: `Fresh router IP ${nextRouterIp} verified on ${router.label || router.id}; waiting for phone-side IP verification`
     });
     return {
-      ok: false,
-      error: restartResult.error || `${canCycleUsbUplink ? "Uplink cycle" : "Router restart"} failed`,
-      detail: restartResult.payload || null
+      ok: true,
+      attempts: attempt,
+      uplinkCycled: true,
+      routerPublicIp: nextRouterIp,
+      reconnectResult: connectResult
     };
   }
 
-  logActivity(
-    canCycleUsbUplink ? "uplink" : "router",
-    canCycleUsbUplink
-      ? `${router.label || router.id} LinkPro uplink cycled automatically before session start by ${user.username}`
-      : `${router.label || router.id} restarted automatically before session start by ${user.username}`,
-    serial
-  );
-
-  if (!canCycleUsbUplink) {
-    await delay(Number(policy.routerRestartSettleMs) || 45000);
-  }
-
-  if (!policy.reconnectPhoneAfterRouterRestart) {
-    return { ok: true, routerRestarted: !canCycleUsbUplink, uplinkCycled: canCycleUsbUplink, reconnectSkipped: true };
-  }
-
   updateDeviceState(serial, {
-    prepMessage: canCycleUsbUplink
-      ? `Reconnecting phone to ${router.label || router.id} after LinkPro uplink cycle`
-      : `Reconnecting phone to ${router.label || router.id} after router restart`
+    prepMessage: lastError || `LinkPro fresh-IP gate failed for ${router.label || router.id}`
   });
-  const connectResult = await connectPhoneToRouterAsync(serial, router);
-  if (!connectResult.ok) {
-    updateDeviceState(serial, {
-      prepMessage: connectResult.error || `Phone-to-router reconnect failed for ${router.label || router.id}`
-    });
-    return { ok: false, error: connectResult.error || "Phone-to-router reconnect failed", detail: connectResult.payload || null };
-  }
-
-  logActivity("router-connect", connectResult.manualAssist
-    ? `Phone-to-router reconnect needs manual completion after ${canCycleUsbUplink ? "LinkPro uplink cycle" : "router restart"} for ${router.label || router.id}`
-    : `Phone reconnected to ${router.label || router.id} after automatic ${canCycleUsbUplink ? "LinkPro uplink cycle" : "router restart"}`, serial);
-
-  await delay(Number(policy.reconnectWaitMs) || 8000);
-  updateDeviceState(serial, {
-    prepMessage: `${canCycleUsbUplink ? "LinkPro uplink cycle" : "Router restart"} completed for ${router.label || router.id}; verifying fresh IP`
-  });
+  await setDeviceWifiStateAsync(serial, false);
   return {
-    ok: true,
-    routerRestarted: !canCycleUsbUplink,
-    uplinkCycled: canCycleUsbUplink,
-    reconnectResult: connectResult
+    ok: false,
+    error: lastError || `LinkPro fresh-IP gate failed for ${router.label || router.id}`,
+    detail: lastDetail
   };
 }
 
@@ -1547,6 +1711,7 @@ function buildMissingDevice(serial) {
     reusePolicyLabel: "",
     reusePolicyWindowHours: ipPolicy.maxAgeHours,
     reusePolicyHistoryLimit: ipPolicy.historyLimit,
+    location: null,
     lastError: "",
     lastReason: ""
   };
@@ -1560,7 +1725,7 @@ function buildMissingDevice(serial) {
     transportId: "",
     nickname: deviceConfig.nickname || "",
     phoneNumber: deviceConfig.phoneNumber || null,
-    role: deviceConfig.role || "sim-direct",
+    role: normalizeDeviceRole(deviceConfig.role),
     parentHotspotSerial: deviceConfig.parentHotspotSerial || "",
     routerId: deviceConfig.routerId || "",
       routerSlot: parsePositiveIntegerOrNull(deviceConfig.routerSlot),
@@ -1632,6 +1797,9 @@ async function refreshDevices() {
     Number(settings.deviceRefresh?.accountRefreshIntervalMs) || 30000,
     Number(settings.deviceRefresh?.accountChecksPerPass) || 2
   );
+  for (const serial of selectPriorityAccountRefreshSerials(rows, previous, 4)) {
+    accountRefreshSet.add(serial);
+  }
 
   const resolvedRows = await Promise.all(rows.map(async row => {
     const stored = state.devices[row.serial] || {};
@@ -1679,7 +1847,7 @@ async function refreshDevices() {
         transportId: row.transportId || "",
         nickname: metadata.nickname || "",
         phoneNumber: metadata.phoneNumber || null,
-        role: metadata.role || "sim-direct",
+        role: normalizeDeviceRole(metadata.role),
         parentHotspotSerial: metadata.parentHotspotSerial || "",
         routerId: metadata.routerId || "",
         routerSlot: parsePositiveIntegerOrNull(metadata.routerSlot),
@@ -2006,6 +2174,54 @@ function getProbeAgeMs(probe) {
     return Number.MAX_SAFE_INTEGER;
   }
   return Math.max(Date.now() - checkedAt, 0);
+}
+
+function shouldPrioritizeAccountProbe(row, previousDevice, previousAccount) {
+  if (row?.state !== "device") {
+    return false;
+  }
+
+  const account = previousAccount || {};
+  const status = String(account.status || "").toLowerCase();
+  const gmail = String(account.gmail || "").trim();
+  const missingAssignedEmail = !gmail && ["", "unknown", "unassigned", "unavailable", "offline"].includes(status);
+  const newlyOnline = previousDevice?.adbState && previousDevice.adbState !== "device";
+
+  if (!newlyOnline && !missingAssignedEmail) {
+    return false;
+  }
+
+  return getProbeAgeMs(account) >= 5000;
+}
+
+function selectPriorityAccountRefreshSerials(rows, previous, limit = 4) {
+  const effectiveLimit = Math.max(Number(limit) || 0, 0);
+  if (!effectiveLimit) {
+    return new Set();
+  }
+
+  const candidates = rows
+    .filter(row => row.state === "device")
+    .map(row => {
+      const previousDevice = previous[row.serial] || state.devices?.[row.serial] || null;
+      const previousAccount = getCachedProbeValue(previous, row.serial, "account", null);
+      return {
+        serial: row.serial,
+        newlyOnline: Boolean(previousDevice?.adbState && previousDevice.adbState !== "device"),
+        ageMs: getProbeAgeMs(previousAccount),
+        priority: shouldPrioritizeAccountProbe(row, previousDevice, previousAccount)
+      };
+    })
+    .filter(entry => entry.priority)
+    .sort((a, b) => {
+      if (a.newlyOnline !== b.newlyOnline) {
+        return a.newlyOnline ? -1 : 1;
+      }
+      return b.ageMs - a.ageMs;
+    })
+    .slice(0, effectiveLimit);
+
+  return new Set(candidates.map(entry => entry.serial));
 }
 
 function selectProbeRefreshSerials(rows, previous, key, staleAfterMs, limit) {
@@ -2419,7 +2635,43 @@ async function runDevicePublicIpCheck(serial, reason) {
   }
 }
 
-function performDevicePublicIpCheck(serial, reason) {
+async function lookupPublicIpLocation(ip) {
+  if (!isUsablePublicIp(ip)) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, {
+      signal: AbortSignal.timeout(7000),
+      headers: {
+        "User-Agent": "RouterFarm/20260418"
+      }
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const payload = await response.json();
+    if (!payload || payload.success === false) {
+      return null;
+    }
+    const timezoneValue = typeof payload.timezone === "object"
+      ? (payload.timezone.id || payload.timezone.name || "")
+      : String(payload.timezone || "");
+    const location = {
+      city: String(payload.city || ""),
+      region: String(payload.region || payload.regionName || ""),
+      country: String(payload.country || ""),
+      timezone: timezoneValue,
+      source: "ipwho.is",
+      checkedAt: new Date().toISOString()
+    };
+    return mergePublicIpLocation({}, location).location;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function performDevicePublicIpCheck(serial, reason) {
   const startedAt = new Date().toISOString();
   const deviceState = state.devices?.[serial] || {};
   const history = ensureDeviceIpHistory(serial);
@@ -2474,6 +2726,7 @@ function performDevicePublicIpCheck(serial, reason) {
       reusePolicyLabel: deviceState.publicIp?.reusePolicyLabel || "",
       reusePolicyWindowHours: ipPolicy.maxAgeHours,
       reusePolicyHistoryLimit: ipPolicy.historyLimit,
+      location: deviceState.publicIp?.location || null,
       lastError: failure || "Public IP lookup failed on device side.",
       lastReason: reason
     };
@@ -2488,7 +2741,7 @@ function performDevicePublicIpCheck(serial, reason) {
         error: failedState.lastError
       },
       ...(history.entries || [])
-    ].slice(0, 100);
+    ].slice(0, ipPolicy.historyLimit);
     saveDeviceIpHistory();
     logIpCheck(`FAILED reason=${reason} error=${failedState.lastError}`, serial);
     logActivity("ip-check", `Public IP check failed: ${failedState.lastError}`, serial);
@@ -2517,7 +2770,7 @@ function performDevicePublicIpCheck(serial, reason) {
     status = "reused";
   }
 
-  const publicIpState = {
+  let publicIpState = {
     currentIp: resolvedIp,
     lastCheckedAt: checkedAt,
     status,
@@ -2534,6 +2787,7 @@ function performDevicePublicIpCheck(serial, reason) {
     lastError: "",
     lastReason: reason
   };
+  publicIpState = mergePublicIpLocation(publicIpState, await lookupPublicIpLocation(resolvedIp));
 
   updateDeviceState(serial, { publicIp: publicIpState });
 
@@ -2549,7 +2803,7 @@ function performDevicePublicIpCheck(serial, reason) {
       reusedRecently
     },
     ...(history.entries || [])
-  ].slice(0, 100);
+  ].slice(0, ipPolicy.historyLimit);
   history.lastSuccessfulIp = resolvedIp;
   history.lastVerifiedAt = checkedAt;
   if (reason === "post-prep") {
@@ -2849,6 +3103,19 @@ function getQueueWaitMs(device) {
 }
 
 function buildActivationLock(device, activeSession = getActiveSession()) {
+  if (!deviceRequiresRouter(device)) {
+    if (!activeSession || activeSession.serial === device.serial) {
+      return {
+        allowed: true,
+        reason: ""
+      };
+    }
+    return {
+      allowed: false,
+      reason: `${activeSession.label || activeSession.serial} is already the globally active device.`
+    };
+  }
+
   if (!device.routerId) {
     return {
       allowed: false,
@@ -2881,11 +3148,6 @@ function buildActivationLock(device, activeSession = getActiveSession()) {
     allowed: false,
     reason: `${activeSession.label || activeSession.serial} is already the globally active device.`
   };
-}
-
-function deviceLooksOnRouterWifi(device) {
-  const interfaceName = String(device?.network?.interface || "").toLowerCase();
-  return interfaceName.startsWith("wlan") || interfaceName.includes("wifi");
 }
 
 function getRouterTopologyGate(router, routerState) {
@@ -3002,6 +3264,7 @@ function normalizePublicIpState(serial, publicIp) {
     .slice(0, 10);
   return {
     ...(publicIp || {}),
+    location: publicIp?.location || null,
     reusedRecently: crossDeviceReuse.length > 0,
     reusedWithinLast100: crossDeviceReuse,
     last100History: normalizedHistory,
@@ -3016,6 +3279,13 @@ function normalizePublicIpState(serial, publicIp) {
 
 function getDeviceRoutingRisk(device, routingAudit, routingGuard = buildRoutingGuard(routingAudit)) {
   const interfaceName = String(device.network?.interface || "").toLowerCase();
+  if (!deviceRequiresRouter(device)) {
+    return {
+      level: "neutral",
+      label: "SIM Direct",
+      detail: "This phone is marked SIM-direct and is not expected to route through an Opal."
+    };
+  }
   if (device.routerId && device.online && interfaceName && !deviceLooksOnRouterWifi(device)) {
     return {
       level: "warning",

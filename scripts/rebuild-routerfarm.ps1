@@ -1,32 +1,21 @@
-param(
-  [string]$Root = "C:\Users\everg\routerfarm-release",
-  [string]$ExePath = "C:\Users\everg\routerfarm-release\dist\win-unpacked\RouterFarm.exe",
-  [string]$LockPath = "C:\Users\everg\routerfarm-release\logs\watch-routerfarm.maintenance.lock"
-)
-
+# Rebuild and Refresh RouterFarm Deployment
 $ErrorActionPreference = "Stop"
 
-function Set-MaintenanceLock {
-  $dir = Split-Path -Parent $LockPath
-  if (-not (Test-Path -LiteralPath $dir)) {
-    New-Item -ItemType Directory -Path $dir -Force | Out-Null
-  }
+$root = "C:\Users\everg\routerfarm-release"
+$scriptsDir = Join-Path $root "scripts"
+$watchdogScript = Join-Path $scriptsDir "watch-routerfarm.ps1"
 
-  Set-Content -LiteralPath $LockPath -Value ("build-started={0}" -f ([DateTime]::Now.ToString("s")))
-}
+Write-Host "Stopping RouterFarm processes..."
+Get-Process RouterFarm -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like "*server.js*" } | Stop-Process -Force -ErrorAction SilentlyContinue
 
-function Clear-MaintenanceLock {
-  if (Test-Path -LiteralPath $LockPath) {
-    Remove-Item -LiteralPath $LockPath -Force
-  }
-}
+Write-Host "Updating Watchdog script..."
+$c = 'param([string]$ExePath="C:\Users\everg\routerfarm-release\dist\win-unpacked\RouterFarm.exe",[string]$ServerScript="C:\Users\everg\routerfarm-release\server.js",[string]$StatusUrl="http://127.0.0.1:7781/api/status",[int]$PollSeconds=20,[string]$LogPath="C:\Users\everg\routerfarm-release\logs\watch-routerfarm.log")'
+$c += "`n" + 'function Write-WatchLog([string]$m){$t=Get-Date -Format "yyyy-MM-dd HH:mm:ss";"[$t] $m"|Add-Content -Path $LogPath}'
+$c += "`n" + 'while($true){try{$h=$false;try{$r=Invoke-RestMethod -Uri $StatusUrl -TimeoutSec 5;$h=[bool]$r.ok}catch{$h=$false};if(-not $h){Write-WatchLog "Server down. Restarting...";Get-Process node -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like "*server.js*"}|Stop-Process -Force -ErrorAction SilentlyContinue;Start-Process "node.exe" -ArgumentList $ServerScript -WorkingDirectory (Split-Path $ServerScript) -WindowStyle Hidden;Start-Sleep -Seconds 10};if(-not (Get-Process RouterFarm -ErrorAction SilentlyContinue)){Write-WatchLog "App down. Restarting...";Start-Process $ExePath -WorkingDirectory (Split-Path (Split-Path $ExePath))}}catch{Write-WatchLog "Error: $($_.Exception.Message)"};Start-Sleep -Seconds $PollSeconds}'
+Set-Content -Path $watchdogScript -Value $c
 
-try {
-  Set-MaintenanceLock
-  Get-Process RouterFarm -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-  Start-Sleep -Seconds 2
-  node "$Root\node_modules\electron-builder\cli.js" --win portable --x64 --config.win.signAndEditExecutable=false
-  Start-Process -FilePath $ExePath | Out-Null
-} finally {
-  Clear-MaintenanceLock
-}
+Write-Host "Re-installing Watchdog Task..."
+& powershell.exe -ExecutionPolicy Bypass -File (Join-Path $scriptsDir "install-routerfarm-watchdog.ps1")
+
+Write-Host "Rebuild Complete."

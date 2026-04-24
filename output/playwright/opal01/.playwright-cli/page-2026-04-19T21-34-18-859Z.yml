@@ -1,0 +1,152 @@
+- generic [ref=e89]:
+  - generic [ref=e91]:
+    - generic [ref=e92]:
+      - link [ref=e93] [cursor=pointer]:
+        - /url: https://www.gl-inet.com/
+        - img [ref=e94]
+      - generic [ref=e108]:
+        - text: Admin Panel
+        - generic [ref=e109] [cursor=pointer]: v4.3.28
+    - generic [ref=e110]:
+      - generic [ref=e111]:
+        - link "" [ref=e112] [cursor=pointer]:
+          - /url: https://docs.gl-inet.com/router/en/4
+          - generic [ref=e113]: 
+        - generic [ref=e114] [cursor=pointer]: 
+        - generic [ref=e115] [cursor=pointer]: 
+        - generic [ref=e118]:
+          - generic [ref=e120] [cursor=pointer]: 
+          - list [ref=e121]:
+            - listitem [ref=e122] [cursor=pointer]: default
+            - listitem [ref=e123] [cursor=pointer]: Classic
+            - listitem [ref=e124] [cursor=pointer]: Dark
+        - generic [ref=e126] [cursor=pointer]:
+          - generic [ref=e129]: en
+          - list [ref=e130]:
+            - listitem [ref=e131]: English
+            - listitem [ref=e132]: 简体中文
+            - listitem [ref=e133]: 繁體中文
+            - listitem [ref=e134]: Deutsch
+            - listitem [ref=e135]: Español
+            - listitem [ref=e136]: Italiano
+            - listitem [ref=e137]: 日本語
+            - listitem [ref=e138]: 한국어
+      - text: 
+  - generic [ref=e139]:
+    - generic [ref=e141]:
+      - menubar [ref=e142]:
+        - menuitem " Internet" [ref=e143] [cursor=pointer]:
+          - generic [ref=e144]: 
+          - generic [ref=e145]: Internet
+        - menuitem " Wireless" [ref=e146] [cursor=pointer]:
+          - generic [ref=e147]: 
+          - generic [ref=e148]: Wireless
+        - menuitem " Clients" [ref=e149] [cursor=pointer]:
+          - generic [ref=e150]: 
+          - generic [ref=e151]: Clients
+        - menuitem " VPN " [ref=e152]:
+          - generic [ref=e153] [cursor=pointer]:
+            - generic [ref=e154]: 
+            - generic [ref=e155]: VPN
+            - generic [ref=e156]: 
+        - menuitem " Applications " [ref=e157]:
+          - generic [ref=e158] [cursor=pointer]:
+            - generic [ref=e159]: 
+            - generic [ref=e160]: Applications
+            - generic [ref=e161]: 
+        - menuitem " Network " [ref=e162]:
+          - generic [ref=e163] [cursor=pointer]:
+            - generic [ref=e164]: 
+            - generic [ref=e165]: Network
+            - generic [ref=e166]: 
+        - menuitem " System  " [ref=e167]:
+          - generic [ref=e168] [cursor=pointer]:
+            - generic [ref=e169]: 
+            - generic [ref=e170]:
+              - text: System
+              - generic [ref=e171]: 
+            - generic [ref=e172]: 
+          - text: 
+      - text:  
+    - generic [ref=e173]:
+      - generic [ref=e175]:
+        - generic [ref=e176]:
+          - text:  
+          - list [ref=e178]:
+            - listitem [ref=e179]:
+              - generic [ref=e181] [cursor=pointer]: 
+            - listitem [ref=e183]:
+              - generic [ref=e185] [cursor=pointer]: 
+            - listitem [ref=e187]:
+              - generic [ref=e189] [cursor=pointer]: 
+            - listitem [ref=e191]:
+              - generic [ref=e193] [cursor=pointer]: 
+          - generic [ref=e196]:
+            - img [ref=e199]
+            - generic [ref=e251]: GL-SFT1200
+            - list [ref=e252]:
+              - listitem [ref=e253] [cursor=pointer]:
+                - generic [ref=e254]: 
+                - text: IPv6
+              - listitem [ref=e255] [cursor=pointer]:
+                - generic [ref=e256]: 
+                - text: VPN
+              - listitem [ref=e257] [cursor=pointer]:
+                - generic [ref=e258]: 
+                - text: Tor
+            - list [ref=e259] [cursor=pointer]:
+              - listitem [ref=e260]:
+                - generic [ref=e261]: 
+              - listitem [ref=e262]:
+                - generic [ref=e263]: 
+              - listitem [ref=e264]:
+                - generic [ref=e265]: 
+              - listitem [ref=e266]:
+                - generic [ref=e267]: 
+          - list [ref=e270]:
+            - listitem [ref=e271]:
+              - generic [ref=e273] [cursor=pointer]:
+                - generic [ref=e274]: 
+                - generic [ref=e275]: "0"
+            - listitem [ref=e276]:
+              - generic [ref=e278] [cursor=pointer]:
+                - generic [ref=e279]: 
+                - generic [ref=e280]: "9"
+        - generic [ref=e281]:
+          - generic [ref=e284]:
+            - generic [ref=e288]: Tethering
+            - generic [ref=e289]:
+              - generic [ref=e290]: Connecting…
+              - generic [ref=e292]:
+                - generic [ref=e293]:
+                  - generic [ref=e294]: Device
+                  - generic [ref=e297]:
+                    - textbox "请选择" [disabled] [ref=e298]: eth1
+                    - generic [ref=e300] [cursor=pointer]: 
+                - button "Abort" [ref=e302] [cursor=pointer]
+                - text: 
+          - generic [ref=e305]:
+            - generic [ref=e307]: Ethernet
+            - generic [ref=e311]:
+              - generic [ref=e313]: 
+              - text: No cable detected in WAN port. Please insert an ethernet cable.
+            - generic [ref=e315]: Using as WAN, Change to LAN
+          - generic [ref=e317]:
+            - generic [ref=e318]:
+              - generic [ref=e319]:
+                - generic [ref=e323]: Repeater
+                - generic [ref=e325] [cursor=pointer]: 
+              - generic [ref=e328]:
+                - generic [ref=e330]: 
+                - generic [ref=e331]: Repeater (STA) is disabled.Connect
+            - generic:  
+          - generic [ref=e334]:
+            - generic [ref=e338]: Cellular
+            - generic [ref=e341]:
+              - generic [ref=e343]: 
+              - generic [ref=e344]: No Modem device found. Plug in your USB modem to start.
+      - heading "Copyright © 2025 GL.iNet. All Rights Reserved" [level=6] [ref=e347]:
+        - text: Copyright © 2025
+        - link "GL.iNet." [ref=e348] [cursor=pointer]:
+          - /url: https://www.gl-inet.com/
+        - text: All Rights Reserved

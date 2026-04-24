@@ -1,0 +1,84 @@
+- generic [ref=e89]:
+  - generic [ref=e91]:
+    - generic [ref=e92]:
+      - link [ref=e93] [cursor=pointer]:
+        - /url: https://www.gl-inet.com/
+        - img [ref=e94]
+      - generic [ref=e108]:
+        - text: Admin Panel
+        - generic [ref=e109] [cursor=pointer]: v4.3.28
+    - generic [ref=e110]:
+      - generic [ref=e111]:
+        - link "" [ref=e112] [cursor=pointer]:
+          - /url: https://docs.gl-inet.com/router/en/4
+          - generic [ref=e113]: 
+        - generic [ref=e114] [cursor=pointer]: 
+        - generic [ref=e115] [cursor=pointer]: 
+        - generic [ref=e118]:
+          - generic [ref=e120] [cursor=pointer]: 
+          - list [ref=e121]:
+            - listitem [ref=e122] [cursor=pointer]: default
+            - listitem [ref=e123] [cursor=pointer]: Classic
+            - listitem [ref=e124] [cursor=pointer]: Dark
+        - generic [ref=e126] [cursor=pointer]:
+          - generic [ref=e129]: en
+          - list [ref=e130]:
+            - listitem [ref=e131]: English
+            - listitem [ref=e132]: 简体中文
+            - listitem [ref=e133]: 繁體中文
+            - listitem [ref=e134]: Deutsch
+            - listitem [ref=e135]: Español
+            - listitem [ref=e136]: Italiano
+            - listitem [ref=e137]: 日本語
+            - listitem [ref=e138]: 한국어
+      - text: 
+  - generic [ref=e139]:
+    - generic [ref=e141]:
+      - menubar [ref=e142]:
+        - menuitem " Internet" [ref=e143] [cursor=pointer]:
+          - generic [ref=e144]: 
+          - generic [ref=e145]: Internet
+        - menuitem " Applications " [ref=e146]:
+          - generic [ref=e147] [cursor=pointer]:
+            - generic [ref=e148]: 
+            - generic [ref=e149]: Applications
+            - generic [ref=e150]: 
+        - menuitem " Network " [ref=e151]:
+          - generic [ref=e152] [cursor=pointer]:
+            - generic [ref=e153]: 
+            - generic [ref=e154]: Network
+            - generic [ref=e155]: 
+        - menuitem " System  " [ref=e156]:
+          - generic [ref=e157] [cursor=pointer]:
+            - generic [ref=e158]: 
+            - generic [ref=e159]:
+              - text: System
+              - generic [ref=e160]: 
+            - generic [ref=e161]: 
+          - text: 
+      - text:  
+    - generic [ref=e162]:
+      - generic [ref=e165]:
+        - text:  
+        - generic:
+          - list
+        - generic [ref=e167]:
+          - img [ref=e170]
+          - generic [ref=e222]: GL-SFT1200
+          - list [ref=e223]
+        - list [ref=e226]:
+          - listitem [ref=e227]:
+            - generic [ref=e229] [cursor=pointer]:
+              - generic [ref=e230]: 
+              - generic [ref=e231]: "0"
+              - generic [ref=e232]: WLAN Clients
+          - listitem [ref=e233]:
+            - generic [ref=e235] [cursor=pointer]:
+              - generic [ref=e236]: 
+              - generic [ref=e237]: "0"
+              - generic [ref=e238]: LAN Clients
+      - heading "Copyright © 2025 GL.iNet. All Rights Reserved" [level=6] [ref=e241]:
+        - text: Copyright © 2025
+        - link "GL.iNet." [ref=e242] [cursor=pointer]:
+          - /url: https://www.gl-inet.com/
+        - text: All Rights Reserved

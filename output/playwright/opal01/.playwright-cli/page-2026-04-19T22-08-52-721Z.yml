@@ -1,0 +1,14 @@
+- generic [ref=e361]:
+  - img [ref=e363]
+  - img [ref=e378]
+  - generic [ref=e430]:
+    - paragraph [ref=e431]: GL-SFT1200
+    - heading "Admin Password" [level=3] [ref=e432]
+    - generic [ref=e433]:
+      - list [ref=e435]:
+        - listitem [ref=e436]:
+          - generic [ref=e440]:
+            - textbox "Please enter password" [active] [ref=e441]
+            - generic [ref=e443] [cursor=pointer]: 
+      - button "Login" [ref=e445] [cursor=pointer]
+      - generic [ref=e446]: Forgot Password

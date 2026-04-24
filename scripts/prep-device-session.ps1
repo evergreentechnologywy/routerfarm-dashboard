@@ -60,6 +60,23 @@ function Get-DeviceConfig {
   }
 }
 
+function Get-NormalizedRole {
+  param([string]$Role)
+
+  if ([string]::IsNullOrWhiteSpace($Role)) {
+    $normalized = "sim-direct"
+  } else {
+    $normalized = $Role.Trim().ToLowerInvariant()
+  }
+  switch ($normalized) {
+    "router-client" { return "router-linkpro" }
+    "opal-client" { return "router-linkpro" }
+    "router-linkpro" { return "router-linkpro" }
+    "linkpro-routed" { return "router-linkpro" }
+    default { return $normalized }
+  }
+}
+
 function Invoke-Adb {
   param(
     [string[]]$Arguments,
@@ -300,15 +317,17 @@ function Disable-RadiosForReset {
 }
 
 function Restore-RadiosForRole {
-  if ($deviceConfig.role -eq "hotspot-provider") {
+  $normalizedRole = Get-NormalizedRole $deviceConfig.role
+
+  if ($normalizedRole -eq "hotspot-provider") {
     Ensure-MobileDataEnabled
     Enable-Hotspot
     return
   }
 
-  if ($deviceConfig.role -eq "hotspot-client") {
+  if ($normalizedRole -eq "hotspot-client" -or $normalizedRole -eq "router-linkpro") {
     Ensure-WifiEnabled
-    Write-PrepLog -Category "prep" -Message "Device role is hotspot-client; hotspot re-enable skipped"
+    Write-PrepLog -Category "prep" -Message "Device role uses Wi-Fi routing; Wi-Fi recovery applied"
     return
   }
 
@@ -321,16 +340,24 @@ function Wait-ForNetworkRecovery {
 
   Write-PrepLog -Category "prep" -Message "Waiting for device network recovery"
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  $normalizedRole = Get-NormalizedRole $deviceConfig.role
   while ((Get-Date) -lt $deadline) {
     $result = Invoke-Adb -Arguments @("-s", $Serial, "shell", "getprop", "sys.boot_completed") -IgnoreErrors
     $route = Invoke-Adb -Arguments @("-s", $Serial, "shell", "ip", "route") -IgnoreErrors
     $ping1 = Invoke-Adb -Arguments @("-s", $Serial, "shell", "ping", "-c", "1", "1.1.1.1") -IgnoreErrors
     $ping2 = Invoke-Adb -Arguments @("-s", $Serial, "shell", "ping", "-c", "1", "8.8.8.8") -IgnoreErrors
-    if (($result.Output -match "1") -and (
-        ($route.Output -match "default|src\s+\d{1,3}(?:\.\d{1,3}){3}") -or
-        ($ping1.ExitCode -eq 0) -or
-        ($ping2.ExitCode -eq 0)
-      )) {
+    $bootCompleted = $result.Output -match "1"
+    $routeOutput = [string]$route.Output
+    $hasDefaultRoute = $routeOutput -match "(?im)^default\b"
+    $hasAddressedRoute = $routeOutput -match "src\s+\d{1,3}(?:\.\d{1,3}){3}"
+    $hasWifiDefaultRoute = $routeOutput -match "(?im)^default\b.*\bdev\s+wlan\d+\b"
+    $hasPing = ($ping1.ExitCode -eq 0) -or ($ping2.ExitCode -eq 0)
+
+    if ($bootCompleted -and $normalizedRole -in @("hotspot-client", "router-linkpro")) {
+      if ($hasWifiDefaultRoute) {
+        return
+      }
+    } elseif ($bootCompleted -and ($hasDefaultRoute -or $hasAddressedRoute -or $hasPing)) {
       return
     }
     Start-Sleep -Seconds 4

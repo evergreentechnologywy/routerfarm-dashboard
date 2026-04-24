@@ -1,0 +1,14 @@
+[     645ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/views/gl-sdk4-ui-login.common.js?1776636357251:0
+[     699ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/logo.svg:0
+[     699ms] Error: Network Error
+    at t.exports (http://192.168.8.1/js/app.7ec6347c.js:19:76709)
+    at p.onerror (http://192.168.8.1/js/app.7ec6347c.js:53:63351)
+[     736ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/theme/default/index.css?_t=1776636357259:0
+[    1134ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://192.168.8.1/fonts/iconfont.a0bf2071.woff2:0
+[    1161ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://192.168.8.1/fonts/iconfont.39e3ed67.woff:0
+[    1186ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://192.168.8.1/fonts/iconfont.2d7d2f03.ttf:0
+[    1448ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/rpc:0
+[    1448ms] Error: Network Error
+    at t.exports (http://192.168.8.1/js/app.7ec6347c.js:19:76709)
+    at p.onerror (http://192.168.8.1/js/app.7ec6347c.js:53:63351)
+[   23950ms] "jsonrpc":"2.0","id":5,"method":"call","params":["","ui","init",{"lang":"en","username":"root","password":"Admin2023#"}]},"error":{"message":"Access denied","code":-32000}}

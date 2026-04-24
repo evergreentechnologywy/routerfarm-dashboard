@@ -1,0 +1,5 @@
+[    4109ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/rpc:0
+[    4111ms] Error: Network Error
+    at t.exports (http://192.168.8.1/js/app.aed93a47.js:12:76778)
+    at p.onerror (http://192.168.8.1/js/app.aed93a47.js:46:60150)
+[  274117ms] "jsonrpc":"2.0","id":54,"method":"call","params":["qlBzRgyE2P7P3Cat324TafhNYBGa6I38","system","get_status",{}]},"error":{"message":"Access denied","code":-32000}}

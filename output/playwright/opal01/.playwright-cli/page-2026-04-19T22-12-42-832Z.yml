@@ -1,0 +1,131 @@
+- generic [ref=e505]:
+  - generic [ref=e507]:
+    - generic [ref=e508]:
+      - link [ref=e509] [cursor=pointer]:
+        - /url: https://www.gl-inet.com/
+        - img [ref=e510]
+      - generic [ref=e524]:
+        - text: Admin Panel
+        - generic [ref=e525] [cursor=pointer]: v4.3.28
+    - generic [ref=e526]:
+      - generic [ref=e527]:
+        - link "" [ref=e528] [cursor=pointer]:
+          - /url: https://docs.gl-inet.com/router/en/4
+          - generic [ref=e529]: 
+        - generic [ref=e530] [cursor=pointer]: 
+        - generic [ref=e531] [cursor=pointer]: 
+        - generic [ref=e534]:
+          - generic [ref=e536] [cursor=pointer]: 
+          - list [ref=e537]:
+            - listitem [ref=e538] [cursor=pointer]: default
+            - listitem [ref=e539] [cursor=pointer]: Classic
+            - listitem [ref=e540] [cursor=pointer]: Dark
+        - generic [ref=e542] [cursor=pointer]:
+          - generic [ref=e545]: en
+          - list [ref=e546]:
+            - listitem [ref=e547]: English
+            - listitem [ref=e548]: 简体中文
+            - listitem [ref=e549]: 繁體中文
+            - listitem [ref=e550]: Deutsch
+            - listitem [ref=e551]: Español
+            - listitem [ref=e552]: Italiano
+            - listitem [ref=e553]: 日本語
+            - listitem [ref=e554]: 한국어
+      - text: 
+  - generic [ref=e555]:
+    - generic [ref=e557]:
+      - menubar [ref=e558]:
+        - menuitem " Internet" [ref=e559] [cursor=pointer]:
+          - generic [ref=e560]: 
+          - generic [ref=e561]: Internet
+        - menuitem " Wireless" [ref=e562] [cursor=pointer]:
+          - generic [ref=e563]: 
+          - generic [ref=e564]: Wireless
+        - menuitem " Clients" [ref=e565] [cursor=pointer]:
+          - generic [ref=e566]: 
+          - generic [ref=e567]: Clients
+        - menuitem " VPN " [ref=e568]:
+          - generic [ref=e569] [cursor=pointer]:
+            - generic [ref=e570]: 
+            - generic [ref=e571]: VPN
+            - generic [ref=e572]: 
+        - menuitem " Applications " [expanded] [ref=e573]:
+          - generic [ref=e574] [cursor=pointer]:
+            - generic [ref=e575]: 
+            - generic [ref=e576]: Applications
+            - generic [ref=e577]: 
+          - menu [ref=e578]:
+            - listitem [ref=e579]:
+              - list [ref=e580]:
+                - menuitem "Plug-ins" [ref=e581] [cursor=pointer]:
+                  - generic [ref=e582]: Plug-ins
+                - menuitem "Dynamic DNS" [ref=e583] [cursor=pointer]:
+                  - generic [ref=e584]: Dynamic DNS
+                - menuitem "GoodCloud" [ref=e585] [cursor=pointer]:
+                  - generic [ref=e586]: GoodCloud
+        - menuitem " Network " [ref=e587]:
+          - generic [ref=e588] [cursor=pointer]:
+            - generic [ref=e589]: 
+            - generic [ref=e590]: Network
+            - generic [ref=e591]: 
+        - menuitem " System  " [ref=e592]:
+          - generic [ref=e593] [cursor=pointer]:
+            - generic [ref=e594]: 
+            - generic [ref=e595]:
+              - text: System
+              - generic [ref=e596]: 
+            - generic [ref=e597]: 
+          - text: 
+      - text:  
+    - generic [ref=e598]:
+      - generic [ref=e600]:
+        - generic [ref=e601]:
+          - generic [ref=e603]: Plug-ins
+          - button "Manage Sources" [disabled] [ref=e604]
+        - generic [ref=e605]:
+          - generic [ref=e606]:
+            - generic [ref=e609]:
+              - textbox "Filter" [disabled] [ref=e610]
+              - generic [ref=e612] [cursor=pointer]: 
+            - generic [ref=e613]:
+              - generic [ref=e614]: 
+              - textbox "Search Package" [disabled] [ref=e615]
+            - button " Refresh" [disabled] [ref=e616]:
+              - generic [ref=e617]: 
+              - text: Refresh
+          - list [ref=e618]:
+            - listitem [ref=e619]: A
+            - listitem [ref=e620]: B
+            - listitem [ref=e621]: C
+            - listitem [ref=e622]: D
+            - listitem [ref=e623]: E
+            - listitem [ref=e624]: F
+            - listitem [ref=e625]: G
+            - listitem [ref=e626]: H
+            - listitem [ref=e627]: I
+            - listitem [ref=e628]: J
+            - listitem [ref=e629]: K
+            - listitem [ref=e630]: L
+            - listitem [ref=e631]: M
+            - listitem [ref=e632]: "N"
+            - listitem [ref=e633]: O
+            - listitem [ref=e634]: P
+            - listitem [ref=e635]: Q
+            - listitem [ref=e636]: R
+            - listitem [ref=e637]: S
+            - listitem [ref=e638]: T
+            - listitem [ref=e639]: U
+            - listitem [ref=e640]: V
+            - listitem [ref=e641]: W
+            - listitem [ref=e642]: X
+            - listitem [ref=e643]: "Y"
+            - listitem [ref=e644]: Z
+          - generic [ref=e645]:
+            - generic [ref=e647]: 
+            - generic [ref=e648]: The list is Refreshing, please wait...
+        - generic: 
+      - heading "Copyright © 2025 GL.iNet. All Rights Reserved" [level=6] [ref=e651]:
+        - text: Copyright © 2025
+        - link "GL.iNet." [ref=e652] [cursor=pointer]:
+          - /url: https://www.gl-inet.com/
+        - text: All Rights Reserved

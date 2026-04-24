@@ -22,7 +22,7 @@ if (-not (Test-Path $settingsPath)) {
 
 $settings = Get-Content -Raw -Path $settingsPath | ConvertFrom-Json
 $settings.host = "127.0.0.1"
-$settings | ConvertTo-Json -Depth 8 | Set-Content -Path $settingsPath
+$settings | ConvertTo-Json -Depth 8 | Set-Content -Path $settingsPath -Encoding utf8NoBOM
 
 powershell -NoProfile -ExecutionPolicy Bypass -File $stopScript | Out-Null
 Start-Sleep -Seconds 1

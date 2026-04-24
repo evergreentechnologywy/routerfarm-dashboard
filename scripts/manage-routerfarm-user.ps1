@@ -57,5 +57,5 @@ if ($existing) {
   Write-Output "Created user $Username"
 }
 
-$config | ConvertTo-Json -Depth 8 | Set-Content -Path $usersPath
+$config | ConvertTo-Json -Depth 8 | Set-Content -Path $usersPath -Encoding utf8NoBOM
 Write-Output "Saved $usersPath"

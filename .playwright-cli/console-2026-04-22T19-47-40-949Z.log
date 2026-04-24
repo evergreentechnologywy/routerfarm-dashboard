@@ -1,0 +1,50 @@
+[     117ms] [ERROR] Executing inline script violates the following Content Security Policy directive 'default-src http: https: ws:'. Either the 'unsafe-inline' keyword, a hash ('sha256-y7e8USYyCB8G2hWJvgftUNMblcrY1xR5oIZbbmYzC0U='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked. @ http://dongle.tcl-connect.com/:4
+[    2290ms] [LOG] {tmo: Object, metro: Object, defaultTheme: Object} @ http://dongle.tcl-connect.com/dist/js/app.27d75af1.js:1
+[    2534ms] [LOG] API Req error:===》 GetQuickSetup {} TypeError: Cannot read properties of null (reading 'words')
+    at Object._doReset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:48:113946)
+    at Object.reset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40710)
+    at Object.reset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:42227)
+    at Object.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40660)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at Object.create (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196295)
+    at Object.createEncryptor (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40466)
+    at Object.encrypt (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:43277) @ http://dongle.tcl-connect.com/dist/js/app.27d75af1.js:1
+[    2575ms] [LOG] ###############################111# GetQuickSetup null TypeError: Cannot read properties of null (reading 'words')
+    at Object._doReset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:48:113946)
+    at Object.reset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40710)
+    at Object.reset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:42227)
+    at Object.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40660)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at Object.create (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196295)
+    at Object.createDecryptor (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40542)
+    at Object.decrypt (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:43533) @ http://dongle.tcl-connect.com/dist/js/app.27d75af1.js:1
+[    2596ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o @ http://dongle.tcl-connect.com/#/home:0
+[   85668ms] [ERROR] Executing inline script violates the following Content Security Policy directive 'default-src http: https: ws:'. Either the 'unsafe-inline' keyword, a hash ('sha256-y7e8USYyCB8G2hWJvgftUNMblcrY1xR5oIZbbmYzC0U='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked. @ http://dongle.tcl-connect.com/#/home:4
+[   85768ms] [LOG] {tmo: Object, metro: Object, defaultTheme: Object} @ http://dongle.tcl-connect.com/dist/js/app.27d75af1.js:1
+[   86073ms] [LOG] API Req error:===》 GetQuickSetup {} TypeError: Cannot read properties of null (reading 'words')
+    at Object._doReset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:48:113946)
+    at Object.reset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40710)
+    at Object.reset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:42227)
+    at Object.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40660)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at Object.create (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196295)
+    at Object.createEncryptor (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40466)
+    at Object.encrypt (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:43277) @ http://dongle.tcl-connect.com/dist/js/app.27d75af1.js:1
+[   86085ms] [LOG] ###############################111# GetQuickSetup null TypeError: Cannot read properties of null (reading 'words')
+    at Object._doReset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:48:113946)
+    at Object.reset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40710)
+    at Object.reset (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:42227)
+    at Object.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40660)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at n.hasOwnProperty.n.init (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196183)
+    at Object.create (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:21:196295)
+    at Object.createDecryptor (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:40542)
+    at Object.decrypt (http://dongle.tcl-connect.com/dist/js/chunk-vendors.198f9e8e.js:55:43533) @ http://dongle.tcl-connect.com/dist/js/app.27d75af1.js:1
+[   86132ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o @ http://dongle.tcl-connect.com/#/home:0

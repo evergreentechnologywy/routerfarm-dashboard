@@ -8,6 +8,9 @@
   "scripts": {
     "start": "node server.js",
     "start:desktop": "electron .",
+    "test:unit": "node --test ./test/*.test.js",
+    "test:router-connect": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test-connect-phone-to-router.ps1",
+    "test:device-wifi": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test-set-device-wifi-state.ps1",
     "test:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test-routerfarm-smoke.ps1",
     "dist:desktop": "electron-builder --win portable nsis --x64 --config.win.signAndEditExecutable=false"
   },

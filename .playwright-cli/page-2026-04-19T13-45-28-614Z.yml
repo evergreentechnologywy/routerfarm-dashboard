@@ -1,0 +1,16 @@
+- generic [ref=e6]:
+  - generic [ref=e7]:
+    - img "Logo" [ref=e8]
+    - generic [ref=e9]:
+      - button "English " [ref=e12] [cursor=pointer]:
+        - text: English
+        - generic [ref=e13]: 
+      - generic [ref=e15] [cursor=pointer]: Help
+  - generic [ref=e16]:
+    - img "device" [ref=e17]
+    - generic [ref=e18]: Welcome to IK511U
+  - generic [ref=e20]:
+    - generic [ref=e22]:
+      - textbox "Enter password" [ref=e24]: Admin2023##
+      - generic [ref=e30]: Incorrect password.
+    - button "Login" [active] [ref=e27] [cursor=pointer]

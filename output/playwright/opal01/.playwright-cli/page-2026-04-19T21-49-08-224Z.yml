@@ -1,0 +1,160 @@
+- generic [ref=e89]:
+  - generic [ref=e91]:
+    - generic [ref=e92]:
+      - link [ref=e93] [cursor=pointer]:
+        - /url: https://www.gl-inet.com/
+        - img [ref=e94]
+      - generic [ref=e108]:
+        - text: Admin Panel
+        - generic [ref=e109] [cursor=pointer]: v4.3.28
+    - generic [ref=e110]:
+      - generic [ref=e111]:
+        - link "" [ref=e112] [cursor=pointer]:
+          - /url: https://docs.gl-inet.com/router/en/4
+          - generic [ref=e113]: 
+        - generic [ref=e114] [cursor=pointer]: 
+        - generic [ref=e115] [cursor=pointer]: 
+        - generic [ref=e118]:
+          - generic [ref=e120] [cursor=pointer]: 
+          - list [ref=e121]:
+            - listitem [ref=e122] [cursor=pointer]: default
+            - listitem [ref=e123] [cursor=pointer]: Classic
+            - listitem [ref=e124] [cursor=pointer]: Dark
+        - generic [ref=e126] [cursor=pointer]:
+          - generic [ref=e129]: en
+          - list [ref=e130]:
+            - listitem [ref=e131]: English
+            - listitem [ref=e132]: 简体中文
+            - listitem [ref=e133]: 繁體中文
+            - listitem [ref=e134]: Deutsch
+            - listitem [ref=e135]: Español
+            - listitem [ref=e136]: Italiano
+            - listitem [ref=e137]: 日本語
+            - listitem [ref=e138]: 한국어
+      - text: 
+  - generic [ref=e139]:
+    - generic [ref=e141]:
+      - menubar [ref=e142]:
+        - menuitem " Internet" [ref=e143] [cursor=pointer]:
+          - generic [ref=e144]: 
+          - generic [ref=e145]: Internet
+        - menuitem " Wireless" [ref=e146] [cursor=pointer]:
+          - generic [ref=e147]: 
+          - generic [ref=e148]: Wireless
+        - menuitem " Clients" [ref=e149] [cursor=pointer]:
+          - generic [ref=e150]: 
+          - generic [ref=e151]: Clients
+        - menuitem " VPN " [ref=e152]:
+          - generic [ref=e153] [cursor=pointer]:
+            - generic [ref=e154]: 
+            - generic [ref=e155]: VPN
+            - generic [ref=e156]: 
+        - menuitem " Applications " [ref=e157]:
+          - generic [ref=e158] [cursor=pointer]:
+            - generic [ref=e159]: 
+            - generic [ref=e160]: Applications
+            - generic [ref=e161]: 
+        - menuitem " Network " [ref=e162]:
+          - generic [ref=e163] [cursor=pointer]:
+            - generic [ref=e164]: 
+            - generic [ref=e165]: Network
+            - generic [ref=e166]: 
+        - menuitem " System  " [ref=e167]:
+          - generic [ref=e168] [cursor=pointer]:
+            - generic [ref=e169]: 
+            - generic [ref=e170]:
+              - text: System
+              - generic [ref=e171]: 
+            - generic [ref=e172]: 
+          - text: 
+      - text:  
+    - generic [ref=e173]:
+      - generic [ref=e175]:
+        - generic [ref=e176]:
+          - text:  
+          - list [ref=e178]:
+            - listitem [ref=e179]:
+              - generic [ref=e180] [cursor=pointer]:
+                - generic [ref=e181]: Ethernet
+                - generic [ref=e182]: 
+            - listitem [ref=e184]:
+              - generic [ref=e185] [cursor=pointer]:
+                - generic [ref=e186]: Repeater
+                - generic [ref=e187]: 
+            - listitem [ref=e189]:
+              - generic [ref=e190] [cursor=pointer]:
+                - generic [ref=e191]: Tethering
+                - generic [ref=e192]: 
+            - listitem [ref=e194]:
+              - generic [ref=e195] [cursor=pointer]:
+                - generic [ref=e196]: Cellular
+                - generic [ref=e197]: 
+          - generic [ref=e200]:
+            - img [ref=e203]
+            - generic [ref=e255]: GL-SFT1200
+            - list [ref=e256]:
+              - listitem [ref=e257] [cursor=pointer]:
+                - generic [ref=e258]: 
+                - text: IPv6
+              - listitem [ref=e259] [cursor=pointer]:
+                - generic [ref=e260]: 
+                - text: VPN
+              - listitem [ref=e261] [cursor=pointer]:
+                - generic [ref=e262]: 
+                - text: Tor
+            - list [ref=e263] [cursor=pointer]:
+              - listitem [ref=e264]:
+                - generic [ref=e265]: 
+              - listitem [ref=e266]:
+                - generic [ref=e267]: 
+              - listitem [ref=e268]:
+                - generic [ref=e269]: 
+              - listitem [ref=e270]:
+                - generic [ref=e271]: 
+          - list [ref=e274]:
+            - listitem [ref=e275]:
+              - generic [ref=e277] [cursor=pointer]:
+                - generic [ref=e278]: 
+                - generic [ref=e279]: "0"
+                - generic [ref=e280]: WLAN Clients
+            - listitem [ref=e281]:
+              - generic [ref=e283] [cursor=pointer]:
+                - generic [ref=e284]: 
+                - generic [ref=e285]: "9"
+                - generic [ref=e286]: LAN Clients
+        - generic [ref=e287]:
+          - generic [ref=e290]:
+            - generic [ref=e294]: Tethering
+            - generic [ref=e297]:
+              - generic [ref=e298]:
+                - generic [ref=e299]: Device
+                - generic [ref=e302]:
+                  - textbox "请选择" [ref=e303] [cursor=pointer]: eth1
+                  - generic [ref=e305] [cursor=pointer]: 
+              - button "Connect" [ref=e307] [cursor=pointer]
+              - generic [ref=e308]: 
+          - generic [ref=e311]:
+            - generic [ref=e313]: Ethernet
+            - generic [ref=e317]:
+              - generic [ref=e319]: 
+              - text: No cable detected in WAN port. Please insert an ethernet cable.
+            - generic [ref=e321]: Using as WAN, Change to LAN
+          - generic [ref=e323]:
+            - generic [ref=e324]:
+              - generic [ref=e325]:
+                - generic [ref=e329]: Repeater
+                - generic [ref=e331] [cursor=pointer]: 
+              - generic [ref=e334]:
+                - generic [ref=e336]: 
+                - generic [ref=e337]: Repeater (STA) is disabled.Connect
+            - generic:  
+          - generic [ref=e340]:
+            - generic [ref=e344]: Cellular
+            - generic [ref=e347]:
+              - generic [ref=e349]: 
+              - generic [ref=e350]: No Modem device found. Plug in your USB modem to start.
+      - heading "Copyright © 2025 GL.iNet. All Rights Reserved" [level=6] [ref=e353]:
+        - text: Copyright © 2025
+        - link "GL.iNet." [ref=e354] [cursor=pointer]:
+          - /url: https://www.gl-inet.com/
+        - text: All Rights Reserved

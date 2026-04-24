@@ -1,0 +1,192 @@
+- generic [ref=e89]:
+  - generic [ref=e91]:
+    - generic [ref=e92]:
+      - link [ref=e93] [cursor=pointer]:
+        - /url: https://www.gl-inet.com/
+        - img [ref=e94]
+      - generic [ref=e108]:
+        - text: Admin Panel
+        - generic [ref=e109] [cursor=pointer]: v4.3.28
+    - generic [ref=e110]:
+      - generic [ref=e111]:
+        - link "" [ref=e112] [cursor=pointer]:
+          - /url: https://docs.gl-inet.com/router/en/4
+          - generic [ref=e113]: 
+        - generic [ref=e114] [cursor=pointer]: 
+        - generic [ref=e115] [cursor=pointer]: 
+        - generic [ref=e118]:
+          - generic [ref=e120] [cursor=pointer]: 
+          - list [ref=e121]:
+            - listitem [ref=e122] [cursor=pointer]: default
+            - listitem [ref=e123] [cursor=pointer]: Classic
+            - listitem [ref=e124] [cursor=pointer]: Dark
+        - generic [ref=e126] [cursor=pointer]:
+          - generic [ref=e129]: en
+          - list [ref=e130]:
+            - listitem [ref=e131]: English
+            - listitem [ref=e132]: 简体中文
+            - listitem [ref=e133]: 繁體中文
+            - listitem [ref=e134]: Deutsch
+            - listitem [ref=e135]: Español
+            - listitem [ref=e136]: Italiano
+            - listitem [ref=e137]: 日本語
+            - listitem [ref=e138]: 한국어
+      - text: 
+  - generic [ref=e139]:
+    - generic [ref=e141]:
+      - menubar [ref=e142]:
+        - menuitem " Internet" [ref=e143] [cursor=pointer]:
+          - generic [ref=e144]: 
+          - generic [ref=e145]: Internet
+        - menuitem " Wireless" [active] [ref=e146] [cursor=pointer]:
+          - generic [ref=e147]: 
+          - generic [ref=e148]: Wireless
+        - menuitem " Clients" [ref=e149] [cursor=pointer]:
+          - generic [ref=e150]: 
+          - generic [ref=e151]: Clients
+        - menuitem " VPN " [ref=e152]:
+          - generic [ref=e153] [cursor=pointer]:
+            - generic [ref=e154]: 
+            - generic [ref=e155]: VPN
+            - generic [ref=e156]: 
+        - menuitem " Applications " [ref=e157]:
+          - generic [ref=e158] [cursor=pointer]:
+            - generic [ref=e159]: 
+            - generic [ref=e160]: Applications
+            - generic [ref=e161]: 
+        - menuitem " Network " [ref=e162]:
+          - generic [ref=e163] [cursor=pointer]:
+            - generic [ref=e164]: 
+            - generic [ref=e165]: Network
+            - generic [ref=e166]: 
+        - menuitem " System  " [ref=e167]:
+          - generic [ref=e168] [cursor=pointer]:
+            - generic [ref=e169]: 
+            - generic [ref=e170]:
+              - text: System
+              - generic [ref=e171]: 
+            - generic [ref=e172]: 
+          - text: 
+      - text:  
+    - generic [ref=e173]:
+      - generic [ref=e354]:
+        - generic [ref=e356]: Wireless
+        - generic [ref=e359]:
+          - tablist [ref=e363]:
+            - tab "5GHz WiFi" [selected] [ref=e364]:
+              - generic [ref=e365]: 5GHz WiFi
+            - tab "5GHz Guest WiFi" [ref=e367]:
+              - generic [ref=e368]: 5GHz Guest WiFi
+          - generic [ref=e370]:
+            - tabpanel "5GHz WiFi" [ref=e371]:
+              - generic [ref=e373]:
+                - generic [ref=e374]:
+                  - list [ref=e375]:
+                    - listitem [ref=e376]:
+                      - generic [ref=e377]: Enable Wi-Fi
+                      - switch "ON OFF" [checked] [ref=e379] [cursor=pointer]:
+                        - generic [ref=e381]: "ON"
+                        - generic [ref=e382]: "OFF"
+                    - listitem [ref=e383]:
+                      - generic [ref=e384]: TX Power
+                      - generic [ref=e387]:
+                        - textbox "请选择" [ref=e388] [cursor=pointer]: Max
+                        - generic [ref=e390] [cursor=pointer]: 
+                  - list [ref=e391]:
+                    - listitem [ref=e392]:
+                      - generic [ref=e393]: Wi-Fi Name (SSID)
+                      - textbox [disabled] [ref=e398]: OPAL-01-5G
+                    - listitem [ref=e399]:
+                      - generic [ref=e400]: Wi-Fi Security
+                      - generic [ref=e405]:
+                        - textbox "请选择" [disabled] [ref=e406]: WPA2-PSK
+                        - generic [ref=e408] [cursor=pointer]: 
+                    - listitem [ref=e409]:
+                      - generic [ref=e410]: Wi-Fi Password
+                      - generic [ref=e414]:
+                        - textbox [ref=e415]: 7c21fe45
+                        - generic [ref=e418] [cursor=pointer]: 
+                    - listitem [ref=e419]:
+                      - generic [ref=e420]: SSID Visibility
+                      - generic [ref=e425]:
+                        - textbox "请选择" [disabled] [ref=e426]: Shown
+                        - generic [ref=e428] [cursor=pointer]: 
+                    - listitem [ref=e429]:
+                      - generic [ref=e430]: Wi-Fi Mode
+                      - generic [ref=e435]:
+                        - textbox "请选择" [disabled] [ref=e436]: 11a/n/ac
+                        - generic [ref=e438] [cursor=pointer]: 
+                    - listitem [ref=e439]:
+                      - generic [ref=e440]: Bandwidth
+                      - generic [ref=e445]:
+                        - textbox "请选择" [disabled] [ref=e446]: 80 MHz
+                        - generic [ref=e448] [cursor=pointer]: 
+                    - listitem [ref=e449]:
+                      - generic [ref=e450]: Channel
+                      - generic [ref=e455]:
+                        - textbox "请选择" [disabled] [ref=e456]: Auto
+                        - generic [ref=e458] [cursor=pointer]: 
+                - button "Modify" [ref=e460] [cursor=pointer]
+            - text:   
+        - generic [ref=e463]:
+          - tablist [ref=e467]:
+            - tab "2.4GHz WiFi" [selected] [ref=e468]:
+              - generic [ref=e469]: 2.4GHz WiFi
+            - tab "2.4GHz Guest WiFi" [ref=e471]:
+              - generic [ref=e472]: 2.4GHz Guest WiFi
+          - generic [ref=e474]:
+            - tabpanel "5GHz WiFi" [ref=e475]:
+              - generic [ref=e477]:
+                - generic [ref=e478]:
+                  - list [ref=e479]:
+                    - listitem [ref=e480]:
+                      - generic [ref=e481]: Enable Wi-Fi
+                      - switch "ON OFF" [checked] [ref=e483] [cursor=pointer]:
+                        - generic [ref=e485]: "ON"
+                        - generic [ref=e486]: "OFF"
+                    - listitem [ref=e487]:
+                      - generic [ref=e488]: TX Power
+                      - generic [ref=e491]:
+                        - textbox "请选择" [ref=e492] [cursor=pointer]: Max
+                        - generic [ref=e494] [cursor=pointer]: 
+                  - list [ref=e495]:
+                    - listitem [ref=e496]:
+                      - generic [ref=e497]: Wi-Fi Name (SSID)
+                      - textbox [disabled] [ref=e502]: OPAL-01
+                    - listitem [ref=e503]:
+                      - generic [ref=e504]: Wi-Fi Security
+                      - generic [ref=e509]:
+                        - textbox "请选择" [disabled] [ref=e510]: WPA2-PSK
+                        - generic [ref=e512] [cursor=pointer]: 
+                    - listitem [ref=e513]:
+                      - generic [ref=e514]: Wi-Fi Password
+                      - generic [ref=e518]:
+                        - textbox [ref=e519]: 7c21fe45
+                        - generic [ref=e522] [cursor=pointer]: 
+                    - listitem [ref=e523]:
+                      - generic [ref=e524]: SSID Visibility
+                      - generic [ref=e529]:
+                        - textbox "请选择" [disabled] [ref=e530]: Shown
+                        - generic [ref=e532] [cursor=pointer]: 
+                    - listitem [ref=e533]:
+                      - generic [ref=e534]: Wi-Fi Mode
+                      - generic [ref=e539]:
+                        - textbox "请选择" [disabled] [ref=e540]: 11g/n
+                        - generic [ref=e542] [cursor=pointer]: 
+                    - listitem [ref=e543]:
+                      - generic [ref=e544]: Bandwidth
+                      - generic [ref=e549]:
+                        - textbox "请选择" [disabled] [ref=e550]: 20/40 MHz
+                        - generic [ref=e552] [cursor=pointer]: 
+                    - listitem [ref=e553]:
+                      - generic [ref=e554]: Channel
+                      - generic [ref=e559]:
+                        - textbox "请选择" [disabled] [ref=e560]: Auto
+                        - generic [ref=e562] [cursor=pointer]: 
+                - button "Modify" [ref=e564] [cursor=pointer]
+            - text:   
+      - heading "Copyright © 2025 GL.iNet. All Rights Reserved" [level=6] [ref=e352]:
+        - text: Copyright © 2025
+        - link "GL.iNet." [ref=e353] [cursor=pointer]:
+          - /url: https://www.gl-inet.com/
+        - text: All Rights Reserved

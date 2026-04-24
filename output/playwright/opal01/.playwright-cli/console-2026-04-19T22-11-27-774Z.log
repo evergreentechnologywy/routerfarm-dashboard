@@ -1,0 +1,11 @@
+[    4117ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/rpc:0
+[    4117ms] Error: Network Error
+    at t.exports (http://192.168.8.1/js/app.aed93a47.js:12:76778)
+    at p.onerror (http://192.168.8.1/js/app.aed93a47.js:46:60150)
+[    4146ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/fonts/element-icons.535877f5.woff:0
+[   14191ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/js/apn-config.json:0
+[   14190ms] Error: Network Error
+    at t.exports (http://192.168.8.1/js/app.aed93a47.js:12:76778)
+    at p.onerror (http://192.168.8.1/js/app.aed93a47.js:46:60150)
+[   36313ms] "jsonrpc":"2.0","id":29,"method":"call","params":["6nt1mfj6wN7yWbwXZ4KmuPmVCdmEl7Rk","plugins","get_repository_status",{}]},"error":{"message":"Access denied","code":-32000}}
+[   76670ms] "jsonrpc":"2.0","id":39,"method":"call","params":["c74CNgvtoGkVfwg5la8klepDvvDq9GVQ","plugins","get_repository_status",{}]},"error":{"message":"Access denied","code":-32000}}

@@ -7,9 +7,9 @@
   "ipRefreshIntervalMs": 15000,
   "routerRefreshIntervalMs": 20000,
   "topology": {
-    "targetRouters": 15,
+    "targetRouters": 10,
     "targetPhones": 60,
-    "phonesPerRouter": 4,
+    "phonesPerRouter": 3,
     "routerSwitchPorts": 16
   },
   "prep": {
@@ -24,12 +24,12 @@
     "commandTimeoutSeconds": 25,
     "defaultPasswordEnvVar": "ROUTERFARM_ROUTER_PASSWORD",
     "defaultHostKeys": {
-      "192.168.8.1": "ssh-rsa 2048 SHA256:qtn+hKMo/yxaLWuXL6aRpx8Q+0cgIp8FPrr63AE2Wis",
-      "192.168.8.146": "ssh-rsa 2048 SHA256:XOVn/mXGgKOZirwoTB/Z0t+RRCXBTYGiuCEN7ro8bXM",
-      "192.168.8.150": "ssh-rsa 2048 SHA256:A5kTCGEki6oOUcTPR2LiMHHw8XkhfJvOnACzHShZ1R4",
-      "192.168.8.151": "ssh-rsa 2048 SHA256:afeH4885MgHeXUYkHiNwxhcgMwEBdw8J/0K3szw21uY",
+      "192.168.8.1": "SHA256:QGm4Dlw3pepLEpZGLisBaiAmEMSn/e8HZWDr7xQ51fE",
+      "192.168.8.146": "ssh-rsa 2048 SHA256:Vpvsgxrwcivs0+1tzK+Kj1uTc2w70/FLPjkjUfuej+o",
+      "192.168.8.150": "ssh-rsa 2048 SHA256:0wfAfAwSr9O9mN8B6auiH4XZaeHzEda0qA//L9nW3+U",
+      "192.168.8.151": "ssh-rsa 2048 SHA256:OmmxPzxUzgBiquMpf2+kIPRt+oE6AyiNQaibXYd56Qg",
       "192.168.8.154": "ssh-rsa 2048 SHA256:eRJ+/+EEYMvlo026dGmI3k1yFFjtIwSCaFVZgYLe7Jc",
-      "192.168.8.158": "ssh-rsa 2048 SHA256:SjC3J2AFeNAPWz6OYyQgT5Fkxn/Gyu3PUG6LsLTPf0c",
+      "192.168.8.158": "ssh-rsa 2048 SHA256:ecH3pP2eur1lqfLEHMhkWQtmOu8aNTgB4cEgfoi0MEE",
       "192.168.8.185": "ssh-rsa 2048 SHA256:A+n9XS8+4OcTblAguvZdcQHfsYEuTfhY2GSioYkq/VY",
       "192.168.8.195": "ssh-rsa 2048 SHA256:LEFUK+gCrSRyd2tTG1vF72TpjnJz+bgzSGPgrX/8DYw",
       "192.168.8.234": "ssh-rsa 2048 SHA256:2N1PiL2kuh9m+evMBu6pqOyiX5Uh/fnr2RE6R29OVvM",

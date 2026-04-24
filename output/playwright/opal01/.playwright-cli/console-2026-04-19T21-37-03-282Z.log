@@ -1,0 +1,8 @@
+[     528ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/rpc:0
+[     530ms] Error: Network Error
+    at t.exports (http://192.168.8.1/js/app.aed93a47.js:12:76778)
+    at p.onerror (http://192.168.8.1/js/app.aed93a47.js:46:60150)
+[     531ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://192.168.8.1/model.svg:0
+[     530ms] Error: Network Error
+    at t.exports (http://192.168.8.1/js/app.aed93a47.js:12:76778)
+    at p.onerror (http://192.168.8.1/js/app.aed93a47.js:46:60150)
