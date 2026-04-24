@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
     Launches scrcpy for all connected ADB devices to enable screen-based USB debugging authorization.
@@ -138,7 +138,7 @@ foreach ($serial in $devices.Authorized) {
 
 # For unauthorized, attempt once (sometimes works) then queue for watch
 foreach ($serial in $devices.Unauthorized) {
-    Write-Host "[$serial] Unauthorized — attempting scrcpy anyway..." -NoNewline -ForegroundColor Yellow
+    Write-Host "[$serial] Unauthorized - attempting scrcpy anyway..." -NoNewline -ForegroundColor Yellow
     $result = Launch-Scrcpy -ScrcpyPath $scrcpyPath -Serial $serial
     if ($result.Ok -and -not $result.Skipped) {
         Write-Host " OK (unexpected success!)" -ForegroundColor Green
