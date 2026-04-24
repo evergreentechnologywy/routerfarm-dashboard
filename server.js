@@ -16,24 +16,13 @@ const {
   sanitizeRouterId,
   sanitizeAction,
   sanitizeUsername,
-  parsePositiveIntegerOrNull,
   clampInteger
 } = require("./lib/validation");
-const {
-  SESSION_TTL_MS,
-  verifyPassword,
-  createSessionCookie,
-  expireSessionCookie,
-  parseCookies,
-  generateToken,
-  sanitizeUser,
-  userCanAccessDevice
-} = require("./lib/security");
-const {
-  runProcess,
-  runPowerShellScript,
-  parseJsonPayload
-} = require("./lib/process-runner");
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+
+function generateToken() {
+  return crypto.randomBytes(32).toString("hex");
+}
 
 const ROOT = __dirname;
 const CONFIG_DIR = path.join(ROOT, "config");
@@ -50,9 +39,33 @@ const DEVICE_IP_HISTORY_PATH = path.join(CONFIG_DIR, "device-ip-history.json");
 const ACTIVITY_LOG_PATH = path.join(LOG_DIR, "activity.log");
 const IP_CHECK_LOG_PATH = path.join(LOG_DIR, "ip-check.log");
 const PID_PATH = path.join(ROOT, "routerfarm.pid");
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const ROUTERFARM_REMOTE_PREFIX = "/routerfarm";
-const AUTH_DISABLED = process.env.ROUTERFARM_AUTH_DISABLED === "true" || settings.authDisabled || false;
+
+function toWinPath(p) {
+  if (typeof p !== "string") return p;
+  const mntMatch = p.match(/^\/mnt\/([a-zA-Z])\//);
+  if (mntMatch) {
+    return p.replace(/^\/mnt\/[a-zA-Z]\//, `${mntMatch[1].toUpperCase()}:\\`).replace(/\//g, "\\");
+  }
+  return p;
+}
+
+const WIN_ROOT = toWinPath(ROOT);
+const WIN_CONFIG_DIR = toWinPath(CONFIG_DIR);
+const WIN_SCRIPTS_DIR = toWinPath(SCRIPTS_DIR);
+const WIN_LOG_DIR = toWinPath(LOG_DIR);
+const WIN_SETTINGS_PATH = toWinPath(SETTINGS_PATH);
+const WIN_STATE_PATH = toWinPath(STATE_PATH);
+const WIN_USERS_PATH = toWinPath(USERS_PATH);
+const WIN_ROUTING_AUDIT_PATH = toWinPath(ROUTING_AUDIT_PATH);
+const WIN_DEVICES_CONFIG_PATH = toWinPath(DEVICES_CONFIG_PATH);
+const WIN_ROUTERS_CONFIG_PATH = toWinPath(ROUTERS_CONFIG_PATH);
+const WIN_DEVICE_IP_HISTORY_PATH = toWinPath(DEVICE_IP_HISTORY_PATH);
+const WIN_ACTIVITY_LOG_PATH = toWinPath(ACTIVITY_LOG_PATH);
+const WIN_IP_CHECK_LOG_PATH = toWinPath(IP_CHECK_LOG_PATH);
+const WIN_PID_PATH = toWinPath(PID_PATH);
+
+let AUTH_DISABLED = true;
 const AUTH_BYPASS_USER = {
   username: "operator",
   displayName: "Operator",
@@ -146,7 +159,7 @@ const DEFAULT_USERS = {
 };
 
 let settings = loadJson(SETTINGS_PATH, DEFAULT_SETTINGS);
-AUTH_DISABLED = process.env.ROUTERFARM_AUTH_DISABLED === "true" || settings.authDisabled || true;
+AUTH_DISABLED = process.env.ROUTERFARM_AUTH_DISABLED === "true" || settings.authDisabled !== false;
 let state = loadJson(STATE_PATH, DEFAULT_STATE);
 let usersConfig = loadJson(USERS_PATH, DEFAULT_USERS);
 let devicesConfig = loadJson(DEVICES_CONFIG_PATH, DEFAULT_DEVICES_CONFIG);
@@ -1118,7 +1131,7 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     updateDeviceState(serial, { prepMessage: "Clearing airplane mode and recovering radios" });
     const child = runPowerShellScript(
       "recover-device-radios.ps1",
-      ["-Serial", serial, "-SettingsPath", SETTINGS_PATH, "-ActivityLogPath", ACTIVITY_LOG_PATH],
+      ["-Serial", serial, "-SettingsPath", WIN_SETTINGS_PATH, "-ActivityLogPath", WIN_ACTIVITY_LOG_PATH],
       { detached: false }
     );
 
@@ -1153,7 +1166,7 @@ async function handleDeviceActionAsync(res, user, serial, action, body) {
     updateDeviceState(serial, { prepMessage: "Engaging airplane mode" });
     const child = runPowerShellScript(
       "set-device-airplane-mode.ps1",
-      ["-Serial", serial, "-Mode", "on", "-SettingsPath", SETTINGS_PATH, "-ActivityLogPath", ACTIVITY_LOG_PATH],
+      ["-Serial", serial, "-Mode", "on", "-SettingsPath", WIN_SETTINGS_PATH, "-ActivityLogPath", WIN_ACTIVITY_LOG_PATH],
       { detached: false }
     );
 
@@ -1370,14 +1383,14 @@ function executeRouterAction(routerId, action, body) {
   const scriptName = action === "cycle-uplink" ? "cycle-mobile-uplink.ps1" : "invoke-routerfarm-router-action.ps1";
   const args = action === "cycle-uplink"
     ? ["-RouterId", routerId, "-PowerCycleSeconds", String(Number(body?.powerCycleSeconds) || settings.uplinkControl?.defaultPowerCycleSeconds || 12)]
-    : ["-RouterId", routerId, "-Action", action, "-RoutersPath", ROUTERS_CONFIG_PATH, "-SettingsPath", SETTINGS_PATH];
+    : ["-RouterId", routerId, "-Action", action, "-RoutersPath", WIN_ROUTERS_CONFIG_PATH, "-SettingsPath", WIN_SETTINGS_PATH];
 
   const script = spawnSync("powershell.exe", [
     "-NoProfile",
     "-ExecutionPolicy",
     "Bypass",
     "-File",
-    path.join(SCRIPTS_DIR, scriptName),
+    path.join(WIN_SCRIPTS_DIR, scriptName),
     ...args
   ], {
     cwd: ROOT,
@@ -1438,7 +1451,7 @@ async function executeRouterActionAsync(routerId, action, body) {
     "-ExecutionPolicy",
     "Bypass",
     "-File",
-    path.join(SCRIPTS_DIR, scriptName),
+    path.join(WIN_SCRIPTS_DIR, scriptName),
     ...args
   ], {
     cwd: ROOT,
@@ -1488,7 +1501,7 @@ function connectPhoneToRouter(serial, router) {
     "-ExecutionPolicy",
     "Bypass",
     "-File",
-    path.join(SCRIPTS_DIR, "connect-phone-to-router.ps1"),
+    path.join(WIN_SCRIPTS_DIR, "connect-phone-to-router.ps1"),
     "-Serial",
     serial,
     "-Ssid",
@@ -1496,9 +1509,9 @@ function connectPhoneToRouter(serial, router) {
     "-Password",
     String(router?.wifiPassword || ""),
     "-SettingsPath",
-    SETTINGS_PATH
+    WIN_SETTINGS_PATH
   ], {
-    cwd: ROOT,
+    cwd: WIN_ROOT,
     encoding: "utf8",
     windowsHide: true,
     timeout: 120000
@@ -1529,9 +1542,9 @@ async function connectPhoneToRouterAsync(serial, router) {
     "-Password",
     String(router?.wifiPassword || ""),
     "-SettingsPath",
-    SETTINGS_PATH
+    WIN_SETTINGS_PATH
   ], {
-    cwd: ROOT,
+    cwd: WIN_ROOT,
     windowsHide: true,
     timeoutMs: 120000
   });
@@ -1550,7 +1563,7 @@ async function connectPhoneToRouterAsync(serial, router) {
 function setDeviceWifiState(serial, enabled) {
   const script = runPowerShellScript(
     "set-device-wifi-state.ps1",
-    ["-Serial", serial, "-State", enabled ? "enable" : "disable", "-SettingsPath", SETTINGS_PATH],
+    ["-Serial", serial, "-State", enabled ? "enable" : "disable", "-SettingsPath", WIN_SETTINGS_PATH],
     { detached: false, timeout: 20000 }
   );
   const payload = parseJsonPayload(script.stdout);
@@ -1567,15 +1580,15 @@ async function setDeviceWifiStateAsync(serial, enabled) {
     "-ExecutionPolicy",
     "Bypass",
     "-File",
-    path.join(SCRIPTS_DIR, "set-device-wifi-state.ps1"),
+    path.join(WIN_SCRIPTS_DIR, "set-device-wifi-state.ps1"),
     "-Serial",
     serial,
     "-State",
     enabled ? "enable" : "disable",
     "-SettingsPath",
-    SETTINGS_PATH
+    WIN_SETTINGS_PATH
   ], {
-    cwd: ROOT,
+    cwd: WIN_ROOT,
     windowsHide: true,
     timeoutMs: 20000
   });
@@ -2719,13 +2732,13 @@ async function performDevicePublicIpCheck(serial, reason) {
     "-ExecutionPolicy",
     "Bypass",
     "-File",
-    path.join(SCRIPTS_DIR, "check-device-ip.ps1"),
+    path.join(WIN_SCRIPTS_DIR, "check-device-ip.ps1"),
     "-Serial",
     serial,
     "-SettingsPath",
-    SETTINGS_PATH
+    WIN_SETTINGS_PATH
   ], {
-    cwd: ROOT,
+    cwd: WIN_ROOT,
     encoding: "utf8",
     windowsHide: true,
       timeout: 70000
@@ -2909,7 +2922,7 @@ function processPrepQueue() {
 
   const child = runPowerShellScript(
     "prep-device-session.ps1",
-    ["-Serial", serial, "-SettingsPath", SETTINGS_PATH, "-ActivityLogPath", ACTIVITY_LOG_PATH],
+    ["-Serial", serial, "-SettingsPath", WIN_SETTINGS_PATH, "-ActivityLogPath", WIN_ACTIVITY_LOG_PATH],
     { detached: false }
   );
 
@@ -3408,7 +3421,7 @@ function parseViewerLaunchPayload(stdout) {
 }
 
 function runPowerShellScript(scriptName, scriptArgs = [], options) {
-  const scriptPath = path.join(SCRIPTS_DIR, scriptName);
+  const scriptPath = path.join(WIN_SCRIPTS_DIR, scriptName);
   const argsDescription = scriptArgs.length ? ` ${scriptArgs.join(" ")}` : "";
   const shouldLogLifecycle = options?.logLifecycle !== false;
   if (shouldLogLifecycle) {
