@@ -1,211 +1,220 @@
 {
-    "devices":  [
-                    {
-                        "serial":  "23A2C618",
-                        "phoneNumber":  1,
-                        "nickname":  "Phone 01",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-03",
-                        "routerSlot":  3
-                    },
-                    {
-                        "serial":  "23AAC64B",
-                        "phoneNumber":  2,
-                        "nickname":  "Sabrina Benitez",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-10",
-                        "routerSlot":  1
-                    },
-                    {
-                        "serial":  "23AAC652",
-                        "phoneNumber":  3,
-                        "nickname":  "Katy Milano",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-09",
-                        "routerSlot":  1
-                    },
-                    {
-                        "serial":  "23B3C605",
-                        "phoneNumber":  4,
-                        "nickname":  "Phone 04",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-05",
-                        "routerSlot":  3
-                    },
-                    {
-                        "serial":  "23B6C60B",
-                        "phoneNumber":  5,
-                        "nickname":  "Kathy Hart",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-01",
-                        "routerSlot":  1
-                    },
-                    {
-                        "serial":  "23BFC639",
-                        "phoneNumber":  6,
-                        "nickname":  "Celine Bellini",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-06",
-                        "routerSlot":  5
-                    },
-                    {
-                        "serial":  "23BFC671",
-                        "phoneNumber":  7,
-                        "nickname":  "Phone 07",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-07",
-                        "routerSlot":  3
-                    },
-                    {
-                        "serial":  "23BFC680",
-                        "phoneNumber":  8,
-                        "nickname":  "Blank 02",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-05",
-                        "routerSlot":  2
-                    },
-                    {
-                        "serial":  "23BFC6BD",
-                        "phoneNumber":  9,
-                        "nickname":  "Phone 09",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-03",
-                        "routerSlot":  4
-                    },
-                    {
-                        "serial":  "23C7C69C",
-                        "phoneNumber":  10,
-                        "nickname":  "Julia Fox",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-01",
-                        "routerSlot":  2
-                    },
-                    {
-                        "serial":  "23DFC6CA",
-                        "phoneNumber":  11,
-                        "nickname":  "Phone 11",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-04",
-                        "routerSlot":  4
-                    },
-                    {
-                        "serial":  "6F6296C5",
-                        "phoneNumber":  12,
-                        "nickname":  "Blank 03",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-06",
-                        "routerSlot":  2
-                    },
-                    {
-                        "serial":  "6F9B97EE",
-                        "phoneNumber":  13,
-                        "nickname":  "Alessia Di Luca",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-11",
-                        "routerSlot":  1
-                    },
-                    {
-                        "serial":  "6FA09768",
-                        "phoneNumber":  14,
-                        "nickname":  "Phone 14",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-07",
-                        "routerSlot":  5
-                    },
-                    {
-                        "serial":  "700197EC",
-                        "phoneNumber":  15,
-                        "nickname":  "Diana Reyes",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-08",
-                        "routerSlot":  1
-                    },
-                    {
-                        "serial":  "A69CAA34",
-                        "phoneNumber":  16,
-                        "nickname":  "Phone 16",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-07",
-                        "routerSlot":  4
-                    },
-                    {
-                        "serial":  "A69CAA5F",
-                        "phoneNumber":  17,
-                        "nickname":  "Nicole Valentina",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-03",
-                        "routerSlot":  2
-                    },
-                    {
-                        "serial":  "A6A5AAB9",
-                        "phoneNumber":  18,
-                        "nickname":  "Phone 18",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-03",
-                        "routerSlot":  5
-                    },
-                    {
-                        "serial":  "A6B2AA09",
-                        "phoneNumber":  19,
-                        "nickname":  "Blank 04",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-07",
-                        "routerSlot":  2
-                    },
-                    {
-                        "serial":  "A6D6AA6C",
-                        "phoneNumber":  20,
-                        "nickname":  "Phone 20",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-04",
-                        "routerSlot":  5
-                    },
-                    {
-                        "serial":  "7001963A",
-                        "phoneNumber":  21,
-                        "nickname":  "Amber Grace",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-06",
-                        "routerSlot":  3
-                    },
-                    {
-                        "serial":  "AC7BAAD5",
-                        "phoneNumber":  22,
-                        "nickname":  "Phone 22",
-                        "role":  "sim-direct",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "",
-                        "routerSlot":  null
-                    },
-                    {
-                        "serial":  "6FEE97CB",
-                        "phoneNumber":  23,
-                        "nickname":  "Gatita Bella",
-                        "role":  "router-linkpro",
-                        "parentHotspotSerial":  "",
-                        "routerId":  "opal-01",
-                        "routerSlot":  3
-                    }
-                ]
+  "devices": [
+    {
+      "serial": "23A2C618",
+      "phoneNumber": 1,
+      "nickname": "Zoe Bahur",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-03",
+      "routerSlot": 3
+    },
+    {
+      "serial": "23AAC64B",
+      "phoneNumber": 2,
+      "nickname": "Sabrina Benitez",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-10",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23AAC652",
+      "phoneNumber": 3,
+      "nickname": "Katy Milano",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-09",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23B3C605",
+      "phoneNumber": 4,
+      "nickname": "Angelina Pellegrini",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-05",
+      "routerSlot": 3
+    },
+    {
+      "serial": "23B6C60B",
+      "phoneNumber": 5,
+      "nickname": "Kathy Hart",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-01",
+      "routerSlot": 1
+    },
+    {
+      "serial": "23BFC639",
+      "phoneNumber": 6,
+      "nickname": "Celine Bellini",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-06",
+      "routerSlot": 5
+    },
+    {
+      "serial": "23BFC671",
+      "phoneNumber": 7,
+      "nickname": "Emma Gall",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-07",
+      "routerSlot": 3
+    },
+    {
+      "serial": "23BFC680",
+      "phoneNumber": 8,
+      "nickname": "Sofia Vega",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-05",
+      "routerSlot": 2
+    },
+    {
+      "serial": "23BFC6BD",
+      "phoneNumber": 9,
+      "nickname": "Wanda Cruz",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-03",
+      "routerSlot": 4
+    },
+    {
+      "serial": "23C7C69C",
+      "phoneNumber": 10,
+      "nickname": "Julia Fox",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-01",
+      "routerSlot": 2
+    },
+    {
+      "serial": "23DFC6CA",
+      "phoneNumber": 11,
+      "nickname": "Laura Bianchi",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-04",
+      "routerSlot": 4
+    },
+    {
+      "serial": "6F6296C5",
+      "phoneNumber": 12,
+      "nickname": "Ts Sweetcat",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-06",
+      "routerSlot": 2
+    },
+    {
+      "serial": "6F9B97EE",
+      "phoneNumber": 13,
+      "nickname": "Alessia Di Luca",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-11",
+      "routerSlot": 1
+    },
+    {
+      "serial": "6FA09768",
+      "phoneNumber": 14,
+      "nickname": "Catalina Aino",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-07",
+      "routerSlot": 5
+    },
+    {
+      "serial": "700197EC",
+      "phoneNumber": 15,
+      "nickname": "Diana Reyes",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-08",
+      "routerSlot": 1
+    },
+    {
+      "serial": "A69CAA34",
+      "phoneNumber": 16,
+      "nickname": "Alice Torres",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-07",
+      "routerSlot": 4
+    },
+    {
+      "serial": "A69CAA5F",
+      "phoneNumber": 17,
+      "nickname": "Nicole Valentina",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-03",
+      "routerSlot": 2
+    },
+    {
+      "serial": "A6A5AAB9",
+      "phoneNumber": 18,
+      "nickname": "Ruby Vega",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-03",
+      "routerSlot": 5
+    },
+    {
+      "serial": "A6B2AA09",
+      "phoneNumber": 19,
+      "nickname": "Mimi",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-07",
+      "routerSlot": 2
+    },
+    {
+      "serial": "A6D6AA6C",
+      "phoneNumber": 20,
+      "nickname": "Lara Balke",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-04",
+      "routerSlot": 5
+    },
+    {
+      "serial": "7001963A",
+      "phoneNumber": 21,
+      "nickname": "Amber Grace",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-06",
+      "routerSlot": 3
+    },
+    {
+      "serial": "AC7BAAD5",
+      "phoneNumber": 22,
+      "nickname": "Victoria Liu",
+      "role": "sim-direct",
+      "parentHotspotSerial": "",
+      "routerId": "",
+      "routerSlot": null
+    },
+    {
+      "serial": "6FEE97CB",
+      "phoneNumber": 23,
+      "nickname": "Gatita Bella",
+      "role": "router-linkpro",
+      "parentHotspotSerial": "",
+      "routerId": "opal-01",
+      "routerSlot": 3
+    },
+    {
+      "serial": "239EC6B6",
+      "phoneNumber": 24,
+      "nickname": "Phone 24",
+      "role": "sim-direct",
+      "parentHotspotSerial": "",
+      "routerId": "",
+      "routerSlot": null
+    }
+  ]
 }
