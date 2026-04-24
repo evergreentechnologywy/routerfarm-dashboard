@@ -9,20 +9,35 @@ const {
   buildRouterOccupancyLock,
   deviceLooksOnRouterWifi,
   isUsablePublicIp,
-  mergePublicIpLocation
+  mergePublicIpLocation,
+  formatDeviceLabel
 } = require("./lib/routerfarm-routing");
 const {
   sanitizeSerial,
   sanitizeRouterId,
   sanitizeAction,
   sanitizeUsername,
-  clampInteger
+  parsePositiveIntegerOrNull,
 } = require("./lib/validation");
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-
-function generateToken() {
-  return crypto.randomBytes(32).toString("hex");
-}
+const {
+  SESSION_TTL_MS,
+  verifyPassword,
+  hashPassword,
+  createSessionCookie,
+  expireSessionCookie,
+  parseCookies,
+  generateToken,
+  sanitizeUser,
+  userCanAccessDevice,
+  checkRateLimit,
+  cleanupRateLimits,
+  isWeakDefaultHash
+} = require("./lib/security");
+const {
+  toWinPath,
+  runProcess,
+  parseJsonPayload
+} = require("./lib/process-runner");
 
 const ROOT = __dirname;
 const CONFIG_DIR = path.join(ROOT, "config");
@@ -41,31 +56,12 @@ const IP_CHECK_LOG_PATH = path.join(LOG_DIR, "ip-check.log");
 const PID_PATH = path.join(ROOT, "routerfarm.pid");
 const ROUTERFARM_REMOTE_PREFIX = "/routerfarm";
 
-function toWinPath(p) {
-  if (typeof p !== "string") return p;
-  const mntMatch = p.match(/^\/mnt\/([a-zA-Z])\//);
-  if (mntMatch) {
-    return p.replace(/^\/mnt\/[a-zA-Z]\//, `${mntMatch[1].toUpperCase()}:\\`).replace(/\//g, "\\");
-  }
-  return p;
-}
-
 const WIN_ROOT = toWinPath(ROOT);
-const WIN_CONFIG_DIR = toWinPath(CONFIG_DIR);
 const WIN_SCRIPTS_DIR = toWinPath(SCRIPTS_DIR);
-const WIN_LOG_DIR = toWinPath(LOG_DIR);
 const WIN_SETTINGS_PATH = toWinPath(SETTINGS_PATH);
-const WIN_STATE_PATH = toWinPath(STATE_PATH);
-const WIN_USERS_PATH = toWinPath(USERS_PATH);
-const WIN_ROUTING_AUDIT_PATH = toWinPath(ROUTING_AUDIT_PATH);
-const WIN_DEVICES_CONFIG_PATH = toWinPath(DEVICES_CONFIG_PATH);
-const WIN_ROUTERS_CONFIG_PATH = toWinPath(ROUTERS_CONFIG_PATH);
-const WIN_DEVICE_IP_HISTORY_PATH = toWinPath(DEVICE_IP_HISTORY_PATH);
 const WIN_ACTIVITY_LOG_PATH = toWinPath(ACTIVITY_LOG_PATH);
-const WIN_IP_CHECK_LOG_PATH = toWinPath(IP_CHECK_LOG_PATH);
-const WIN_PID_PATH = toWinPath(PID_PATH);
 
-let AUTH_DISABLED = true;
+let AUTH_DISABLED = false;
 const AUTH_BYPASS_USER = {
   username: "operator",
   displayName: "Operator",
@@ -159,15 +155,11 @@ const DEFAULT_USERS = {
 };
 
 let settings = loadJson(SETTINGS_PATH, DEFAULT_SETTINGS);
-AUTH_DISABLED = process.env.ROUTERFARM_AUTH_DISABLED === "true" || settings.authDisabled !== false;
+AUTH_DISABLED = process.env.ROUTERFARM_AUTH_DISABLED === "true" || settings.authDisabled === true;
 let state = loadJson(STATE_PATH, DEFAULT_STATE);
 let usersConfig = loadJson(USERS_PATH, DEFAULT_USERS);
 let devicesConfig = loadJson(DEVICES_CONFIG_PATH, DEFAULT_DEVICES_CONFIG);
 let routersConfig = loadJson(ROUTERS_CONFIG_PATH, DEFAULT_ROUTERS_CONFIG);
-if (!state.devices) state.devices = {};
-if (!state.routers) state.routers = {};
-if (!state.queue) state.queue = [];
-if (!state.recentActivity) state.recentActivity = [];
 let preparingSerial = null;
 let deviceCache = {};
 let routerCache = {};
@@ -182,6 +174,30 @@ const missingTools = new Set();
 const sessions = new Map();
 const ipCheckPromises = new Map();
 const autoRouterConnectInFlight = new Set();
+
+// First-run admin password generation
+if (!fs.existsSync(USERS_PATH) && usersConfig.users.length === 1 && isWeakDefaultHash(usersConfig.users[0].passwordHash)) {
+  const tempPassword = crypto.randomBytes(8).toString("hex");
+  usersConfig.users[0].passwordHash = hashPassword(tempPassword);
+  fs.writeFileSync(USERS_PATH, `${JSON.stringify(usersConfig, null, 2)}\n`);
+  logActivity("system", `First-run admin password generated. Username: admin | Password: ${tempPassword} | CHANGE THIS IMMEDIATELY.`);
+  console.error(`\n╔════════════════════════════════════════════════════════════════════╗`);
+  console.error(`║  ROUTERFARM SECURITY: FIRST-RUN ADMIN PASSWORD GENERATED          ║`);
+  console.error(`╠════════════════════════════════════════════════════════════════════╣`);
+  console.error(`║  Username: admin                                                   ║`);
+  console.error(`║  Password: ${tempPassword.padEnd(52)}║`);
+  console.error(`║                                                                    ║`);
+  console.error(`║  Change this password immediately via the dashboard or by editing  ║`);
+  console.error(`║  config/users.json with hashPassword() from lib/security.js        ║`);
+  console.error(`╚════════════════════════════════════════════════════════════════════╝\n`);
+} else if (usersConfig.users.some(u => isWeakDefaultHash(u.passwordHash))) {
+  logActivity("security", "WARNING: One or more users still have the default weak password hash. Change immediately.");
+  console.error("WARNING: Default weak password hash detected. Change admin password immediately.");
+}
+if (!state.devices) state.devices = {};
+if (!state.routers) state.routers = {};
+if (!state.queue) state.queue = [];
+if (!state.recentActivity) state.recentActivity = [];
 
 ensureDirectories();
 writeJsonIfMissing(SETTINGS_PATH, settings);
@@ -214,6 +230,20 @@ setInterval(refreshRouterHealth, settings.routerRefreshIntervalMs || 20000);
 setInterval(safeRefreshRoutingAudit, 30000);
 setInterval(trimRecentActivity, 10000);
 setInterval(cleanExpiredSessions, 300000);
+setInterval(cleanupRateLimits, 600000);
+
+function validateCsrf(req, session) {
+  if (AUTH_DISABLED) return true;
+  if (!session || !session.csrfToken) return false;
+  const header = String(req.headers["x-csrf-token"] || "").trim();
+  return header === session.csrfToken;
+}
+
+function getClientIp(req) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  if (forwarded) return forwarded;
+  return req.socket?.remoteAddress || "127.0.0.1";
+}
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -226,10 +256,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/login") {
       if (AUTH_DISABLED) {
-        return sendJson(res, 200, { ok: true, user: sanitizeUser(AUTH_BYPASS_USER) });
+        return sendJson(res, 200, { ok: true, user: sanitizeUser(AUTH_BYPASS_USER), csrfToken: "" });
       }
       const body = await readJsonBody(req);
-      return handleLogin(res, body);
+      return handleLogin(res, body, getClientIp(req));
     }
 
     if (req.method === "POST" && url.pathname === "/api/logout") {
@@ -252,6 +282,13 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith("/api/")) {
       if (!user) {
         return sendJson(res, 401, { error: "Authentication required" });
+      }
+    }
+
+    if (req.method === "POST" && url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/client-log")) {
+      if (!validateCsrf(req, session)) {
+        logActivity("security", "CSRF validation failed", null);
+        return sendJson(res, 403, { error: "CSRF token missing or invalid" });
       }
     }
 
@@ -390,16 +427,8 @@ function flushStateSave() {
   fs.writeFileSync(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`);
 }
 
-function saveSettings() {
-  fs.writeFileSync(SETTINGS_PATH, `${JSON.stringify(settings, null, 2)}\n`);
-}
-
 function saveDevicesConfig() {
   fs.writeFileSync(DEVICES_CONFIG_PATH, `${JSON.stringify(devicesConfig, null, 2)}\n`);
-}
-
-function saveRoutersConfig() {
-  fs.writeFileSync(ROUTERS_CONFIG_PATH, `${JSON.stringify(routersConfig, null, 2)}\n`);
 }
 
 function saveDeviceIpHistory() {
@@ -432,20 +461,6 @@ function logIpCheck(message, serial = null) {
   fs.appendFileSync(IP_CHECK_LOG_PATH, line);
 }
 
-function parseCookies(cookieHeader) {
-  const cookies = {};
-  for (const part of cookieHeader.split(";")) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    const index = trimmed.indexOf("=");
-    if (index < 0) continue;
-    const key = trimmed.slice(0, index);
-    const value = trimmed.slice(index + 1);
-    cookies[key] = decodeURIComponent(value);
-  }
-  return cookies;
-}
-
 function getSession(token) {
   if (!token) return null;
   const session = sessions.get(token);
@@ -470,40 +485,18 @@ function findUser(username) {
   return (usersConfig.users || []).find(item => item.username === username) || null;
 }
 
-function sanitizeUser(user) {
-  return {
-    username: user.username,
-    displayName: user.displayName || user.username,
-    role: user.role || "operator",
-    allowedDevices: user.allowedDevices || []
-  };
-}
-
-function verifyPassword(password, storedHash) {
-  const parts = String(storedHash || "").split("$");
-  if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
-  const iterations = Number(parts[1]);
-  const salt = parts[2];
-  const expected = parts[3];
-  const actual = crypto.pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("hex");
-  return crypto.timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(expected, "hex"));
-}
-
-function createSessionCookie(token) {
-  return `routerfarm_session=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${SESSION_TTL_MS / 1000}`;
-}
-
-function expireSessionCookie() {
-  return "routerfarm_session=; HttpOnly; Path=/; SameSite=Strict; Max-Age=0";
-}
-
-function handleLogin(res, body) {
+function handleLogin(res, body, clientIp) {
   let username;
   try {
     username = sanitizeUsername(body.username);
   } catch (_e) {
     logActivity("auth", "Failed login attempt for invalid username");
     return sendJson(res, 401, { error: "Invalid username or password" });
+  }
+  const rateLimit = checkRateLimit(clientIp || username);
+  if (!rateLimit.allowed) {
+    logActivity("auth", `Login rate limited for ${username}`);
+    return sendJson(res, 429, { error: "Too many login attempts. Try again later.", retryAfter: rateLimit.waitSeconds });
   }
   const password = String(body.password || "");
   const user = findUser(username);
@@ -513,18 +506,14 @@ function handleLogin(res, body) {
   }
 
   const token = generateToken();
+  const csrfToken = generateToken();
   sessions.set(token, {
     username: user.username,
+    csrfToken,
     expiresAt: Date.now() + SESSION_TTL_MS
   });
   logActivity("auth", `Successful login for ${user.username}`);
-  return sendJson(res, 200, { ok: true, user: sanitizeUser(user) }, [createSessionCookie(token)]);
-}
-
-function userCanAccessDevice(user, serial) {
-  if (!user) return false;
-  const allowed = user.allowedDevices || [];
-  return allowed.includes("*") || allowed.includes(serial);
+  return sendJson(res, 200, { ok: true, user: sanitizeUser(user), csrfToken }, [createSessionCookie(token)]);
 }
 
 function filterDevicesForUser(user) {
@@ -722,18 +711,6 @@ function getNextPhoneNumber() {
 
 function formatPhoneNumber(phoneNumber) {
   return `Phone ${String(phoneNumber).padStart(2, "0")}`;
-}
-
-function parsePositiveIntegerOrNull(value) {
-  const normalized = String(value ?? "").trim();
-  if (!normalized) {
-    return null;
-  }
-  const parsed = Number(normalized);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    return null;
-  }
-  return parsed;
 }
 
 function normalizeDeviceRole(role) {
@@ -987,6 +964,9 @@ function sendJson(res, statusCode, data, extraCookies = []) {
   const headers = {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store, no-cache, must-revalidate, private",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
     Pragma: "no-cache",
     Expires: "0"
   };
@@ -1009,6 +989,9 @@ function serveStatic(urlPath, res) {
   res.writeHead(200, {
     "Content-Type": getContentType(filePath),
     "Cache-Control": "no-store, no-cache, must-revalidate, private",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
     Pragma: "no-cache",
     Expires: "0"
   });
@@ -1033,10 +1016,19 @@ function getContentType(filePath) {
   return "application/octet-stream";
 }
 
+const MAX_BODY_SIZE = 1024 * 1024; // 1 MB
+
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
+    let size = 0;
     req.on("data", chunk => {
+      size += chunk.length;
+      if (size > MAX_BODY_SIZE) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+        return;
+      }
       raw += chunk;
     });
     req.on("end", () => {
@@ -1374,67 +1366,6 @@ async function handleRouterAction(res, user, routerId, action, body) {
   return sendJson(res, 200, { ok: true, detail: result.payload || null, router: routerCache[routerId] || null });
 }
 
-function executeRouterAction(routerId, action, body) {
-  const router = getRouterConfig(routerId);
-  if (!router) {
-    return { ok: false, error: "Unknown router", payload: null };
-  }
-
-  const scriptName = action === "cycle-uplink" ? "cycle-mobile-uplink.ps1" : "invoke-routerfarm-router-action.ps1";
-  const args = action === "cycle-uplink"
-    ? ["-RouterId", routerId, "-PowerCycleSeconds", String(Number(body?.powerCycleSeconds) || settings.uplinkControl?.defaultPowerCycleSeconds || 12)]
-    : ["-RouterId", routerId, "-Action", action, "-RoutersPath", WIN_ROUTERS_CONFIG_PATH, "-SettingsPath", WIN_SETTINGS_PATH];
-
-  const script = spawnSync("powershell.exe", [
-    "-NoProfile",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-File",
-    path.join(WIN_SCRIPTS_DIR, scriptName),
-    ...args
-  ], {
-    cwd: ROOT,
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 60000
-  });
-
-  const payload = parseJsonPayload(script.stdout);
-  const ok = script.status === 0 && payload?.ok;
-  const healthStatus = deriveRouterHealthStatus(action, ok, payload, state.routers?.[routerId] || {});
-  const nextState = {
-    ...(state.routers?.[routerId] || {}),
-    lastAction: action,
-    lastResult: ok ? "ok" : "failed",
-    lastCheckedAt: new Date().toISOString(),
-    lastRestartAt: action === "reboot-router" && ok ? new Date().toISOString() : (state.routers?.[routerId]?.lastRestartAt || ""),
-    healthStatus,
-    detail: payload?.detail || payload?.message || String(script.stderr || "").trim(),
-    routerMode: payload?.telemetry?.mode || state.routers?.[routerId]?.routerMode || "",
-    uplinkMode: payload?.telemetry?.uplinkMode || state.routers?.[routerId]?.uplinkMode || "",
-    uplinkInterface: payload?.telemetry?.uplinkInterface || state.routers?.[routerId]?.uplinkInterface || "",
-    tetheringState: payload?.telemetry?.tetheringState || state.routers?.[routerId]?.tetheringState || "",
-    tetheringError: payload?.telemetry?.tetheringError || state.routers?.[routerId]?.tetheringError || "",
-    tetheringHint: payload?.telemetry?.tetheringHint || state.routers?.[routerId]?.tetheringHint || "",
-    usbPorts: payload?.telemetry?.usbPorts || state.routers?.[routerId]?.usbPorts || "",
-    wanUp: payload?.telemetry?.wanUp === undefined ? Boolean(state.routers?.[routerId]?.wanUp) : Boolean(payload?.telemetry?.wanUp),
-    wanAddress: payload?.telemetry?.wanAddress || state.routers?.[routerId]?.wanAddress || "",
-    wanDevice: payload?.telemetry?.wanDevice || state.routers?.[routerId]?.wanDevice || "",
-    publicIp: payload?.telemetry?.publicIp || state.routers?.[routerId]?.publicIp || "",
-    telemetryCheckedAt: action === "router-health" ? new Date().toISOString() : (state.routers?.[routerId]?.telemetryCheckedAt || "")
-  };
-  state.routers[routerId] = nextState;
-  saveState();
-  refreshRouters();
-
-  return {
-    ok,
-    payload,
-    router,
-    error: payload?.message || String(script.stderr || script.stdout || "").trim() || "Router action failed"
-  };
-}
-
 async function executeRouterActionAsync(routerId, action, body) {
   const router = getRouterConfig(routerId);
   if (!router) {
@@ -1495,39 +1426,6 @@ async function executeRouterActionAsync(routerId, action, body) {
   };
 }
 
-function connectPhoneToRouter(serial, router) {
-  const script = spawnSync("powershell.exe", [
-    "-NoProfile",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-File",
-    path.join(WIN_SCRIPTS_DIR, "connect-phone-to-router.ps1"),
-    "-Serial",
-    serial,
-    "-Ssid",
-    String(router?.ssid || ""),
-    "-Password",
-    String(router?.wifiPassword || ""),
-    "-SettingsPath",
-    WIN_SETTINGS_PATH
-  ], {
-    cwd: WIN_ROOT,
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 120000
-  });
-
-  const payload = parseJsonPayload(script.stdout);
-  const manualAssist = Boolean(payload?.requiresManualAssist);
-  const ok = manualAssist || (script.status === 0 && payload?.ok);
-  return {
-    ok,
-    manualAssist,
-    payload,
-    error: payload?.message || String(script.stderr || script.stdout || "").trim() || "Phone-to-router connect failed."
-  };
-}
-
 async function connectPhoneToRouterAsync(serial, router) {
   const script = await runProcess("powershell.exe", [
     "-NoProfile",
@@ -1557,20 +1455,6 @@ async function connectPhoneToRouterAsync(serial, router) {
     manualAssist,
     payload,
     error: payload?.message || String(script.stderr || script.stdout || "").trim() || "Phone-to-router connect failed."
-  };
-}
-
-function setDeviceWifiState(serial, enabled) {
-  const script = runPowerShellScript(
-    "set-device-wifi-state.ps1",
-    ["-Serial", serial, "-State", enabled ? "enable" : "disable", "-SettingsPath", WIN_SETTINGS_PATH],
-    { detached: false, timeout: 20000 }
-  );
-  const payload = parseJsonPayload(script.stdout);
-  return {
-    ok: script.status === 0 && payload?.ok !== false,
-    payload,
-    error: payload?.message || String(script.stderr || script.stdout || "").trim() || `Failed to ${enabled ? "enable" : "disable"} Wi-Fi.`
   };
 }
 
@@ -1724,22 +1608,6 @@ async function enforceRouterRestartBeforeSession(serial, user, device) {
     error: lastError || `LinkPro fresh-IP gate failed for ${router.label || router.id}`,
     detail: lastDetail
   };
-}
-
-function parseJsonPayload(raw) {
-  const trimmed = String(raw || "").trim();
-  if (!trimmed) {
-    return null;
-  }
-  const lines = trimmed.split(/\r?\n/).filter(Boolean);
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    try {
-      return JSON.parse(lines[index]);
-    } catch (error) {
-      // Keep scanning for the last JSON line.
-    }
-  }
-  return null;
 }
 
 function delay(ms) {
@@ -2164,31 +2032,6 @@ function getIpReusePolicy() {
     maxAgeHours: Math.max(Number(settings.ipReusePolicy?.maxAgeHours) || 72, 1),
     blockSessionStartOnReuse: settings.ipReusePolicy?.blockSessionStartOnReuse !== false
   };
-}
-
-function queryAdbDevices() {
-  const adbPath = settings.adbPath || "adb";
-  const result = spawnSync(adbPath, ["devices", "-l"], {
-    cwd: ROOT,
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 8000
-  });
-  if (result.error) {
-    logMissingToolOnce("adb", result.error.message);
-    return [];
-  }
-  const output = String(result.stdout || "").trim();
-  if (!output) {
-    return [];
-  }
-  return output
-    .split(/\r?\n/)
-    .slice(1)
-    .map(line => line.trim())
-    .filter(Boolean)
-    .map(parseAdbLine)
-    .filter(Boolean);
 }
 
 async function queryAdbDevicesAsync() {
@@ -2744,13 +2587,13 @@ async function performDevicePublicIpCheck(serial, reason) {
       timeout: 70000
     });
 
-  let helperPayload = null;
+  let helperPayload;
   let resolvedIp = "";
   let resolvedSource = "";
   let failure = "";
   try {
     helperPayload = JSON.parse(String(helperResult.stdout || "{}").trim() || "{}");
-  } catch (error) {
+  } catch (_e) {
     helperPayload = null;
   }
 
@@ -3402,10 +3245,6 @@ function formatDuration(durationMs) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function formatDeviceLabel(device) {
-  return device.nickname || (device.phoneNumber ? formatPhoneNumber(device.phoneNumber) : device.serial);
-}
-
 function parseViewerLaunchPayload(stdout) {
   const trimmed = String(stdout || "").trim();
   if (!trimmed) return null;
@@ -3463,71 +3302,4 @@ function runPowerShellScript(scriptName, scriptArgs = [], options) {
   return child;
 }
 
-function runProcess(command, args = [], options = {}) {
-  return new Promise(resolve => {
-    const child = spawn(command, args, {
-      cwd: options.cwd || ROOT,
-      windowsHide: options.windowsHide ?? true,
-      detached: false,
-      stdio: ["ignore", "pipe", "pipe"]
-    });
 
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    let timedOut = false;
-    let timeoutHandle = null;
-
-    const finalize = payload => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-      }
-      resolve(payload);
-    };
-
-    if (child.stdout) {
-      child.stdout.on("data", chunk => {
-        stdout += chunk.toString();
-      });
-    }
-
-    if (child.stderr) {
-      child.stderr.on("data", chunk => {
-        stderr += chunk.toString();
-      });
-    }
-
-    if (options.timeoutMs) {
-      timeoutHandle = setTimeout(() => {
-        timedOut = true;
-        try {
-          child.kill();
-        } catch (error) {
-          // Ignore kill failures on timed out child processes.
-        }
-      }, Math.max(Number(options.timeoutMs) || 0, 1));
-    }
-
-    child.on("error", error => {
-      finalize({
-        stdout,
-        stderr,
-        status: null,
-        error
-      });
-    });
-
-    child.on("exit", code => {
-      finalize({
-        stdout,
-        stderr,
-        status: code,
-        error: timedOut ? new Error(`Process timed out after ${options.timeoutMs}ms`) : null
-      });
-    });
-  });
-}

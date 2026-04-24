@@ -265,7 +265,7 @@ function createWindow(context) {
     backgroundColor: "#f5f7fb",
     webPreferences: {
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
       nodeIntegration: false,
       backgroundThrottling: false,
       preload: path.join(__dirname, "preload.js")
@@ -398,18 +398,25 @@ async function maybeRunDesktopTest(context) {
   });
 }
 
+const VALID_SERIAL_RE = /^[A-Za-z0-9._-]+$/;
+
+function validateSerial(serial) {
+  const s = String(serial || "").trim();
+  if (!s || !VALID_SERIAL_RE.test(s) || s.length > 128) {
+    throw new Error("Invalid serial");
+  }
+  return s;
+}
+
 ipcMain.handle("routerfarm:launch-viewer", async (_event, { serial }) => {
   const context = getWorkspaceContext();
   const scriptPath = path.join(context.root, "scripts", "open-scrcpy-for-device.ps1");
-  return runPowerShellJson(scriptPath, ["-Serial", String(serial)]);
+  return runPowerShellJson(scriptPath, ["-Serial", validateSerial(serial)]);
 });
 
 ipcMain.handle("routerfarm:sync-viewer-state", async (_event, payload) => {
   const context = getWorkspaceContext();
-  const serial = String(payload?.serial || "");
-  if (!serial) {
-    throw new Error("serial is required");
-  }
+  const serial = validateSerial(payload?.serial);
   return postJson(`${context.baseUrl}/api/devices/${encodeURIComponent(serial)}/viewer-state`, payload);
 });
 

@@ -12,6 +12,9 @@
     "test:router-connect": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test-connect-phone-to-router.ps1",
     "test:device-wifi": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test-set-device-wifi-state.ps1",
     "test:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test-routerfarm-smoke.ps1",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "audit": "npm audit",
     "dist:desktop": "electron-builder --win portable nsis --x64 --config.win.signAndEditExecutable=false"
   },
   "build": {
@@ -60,7 +63,10 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "electron": "^37.2.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "eslint": "^10.2.1",
+    "globals": "^17.5.0"
   }
 }
