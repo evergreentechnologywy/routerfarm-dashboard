@@ -21,5 +21,5 @@
 - Bumped version to **2.0.0** across `package.json`, `VERSION`, and frontend cache-busting strings.
 
 ### Notes
-- Android IP Helper package name (`com.phonefarm.iphelper`) remains unchanged to avoid APK rebuild requirements; this will be addressed in a future release.
+- Android IP Helper package name updated from `com.phonefarm.iphelper` to `com.routerfarm.iphelper`; APK must be rebuilt and reinstalled on all devices.
 - PowerShell script pool remains the same; shared-module extraction is planned for v2.1.

@@ -222,8 +222,8 @@ function Parse-PublicIp {
 function Get-PublicIpFromHelper {
   param([string]$Serial)
 
-  $packageName = "com.phonefarm.iphelper"
-  $componentName = "com.phonefarm.iphelper/.MainActivity"
+  $packageName = "com.routerfarm.iphelper"
+  $componentName = "com.routerfarm.iphelper/.MainActivity"
 
   $packageResult = Invoke-Adb -Arguments @("-s", $Serial, "shell", "pm", "path", $packageName)
   if ($packageResult.ExitCode -ne 0 -or $packageResult.Output -notmatch "package:") {
