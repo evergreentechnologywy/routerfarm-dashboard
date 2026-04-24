@@ -11,6 +11,29 @@ const {
   isUsablePublicIp,
   mergePublicIpLocation
 } = require("./lib/routerfarm-routing");
+const {
+  sanitizeSerial,
+  sanitizeRouterId,
+  sanitizeAction,
+  sanitizeUsername,
+  parsePositiveIntegerOrNull,
+  clampInteger
+} = require("./lib/validation");
+const {
+  SESSION_TTL_MS,
+  verifyPassword,
+  createSessionCookie,
+  expireSessionCookie,
+  parseCookies,
+  generateToken,
+  sanitizeUser,
+  userCanAccessDevice
+} = require("./lib/security");
+const {
+  runProcess,
+  runPowerShellScript,
+  parseJsonPayload
+} = require("./lib/process-runner");
 
 const ROOT = __dirname;
 const CONFIG_DIR = path.join(ROOT, "config");
@@ -123,6 +146,7 @@ const DEFAULT_USERS = {
 };
 
 let settings = loadJson(SETTINGS_PATH, DEFAULT_SETTINGS);
+AUTH_DISABLED = process.env.ROUTERFARM_AUTH_DISABLED === "true" || settings.authDisabled || true;
 let state = loadJson(STATE_PATH, DEFAULT_STATE);
 let usersConfig = loadJson(USERS_PATH, DEFAULT_USERS);
 let devicesConfig = loadJson(DEVICES_CONFIG_PATH, DEFAULT_DEVICES_CONFIG);
@@ -184,7 +208,7 @@ const server = http.createServer(async (req, res) => {
     const pathname = normalizeRequestPath(originalUrl.pathname);
     const url = new URL(`${pathname}${originalUrl.search}`, `http://${req.headers.host || "127.0.0.1"}`);
     const cookies = parseCookies(req.headers.cookie || "");
-    const session = AUTH_DISABLED ? null : getSession(cookies.phonefarm_session);
+    const session = AUTH_DISABLED ? null : getSession(cookies.routerfarm_session);
     const user = AUTH_DISABLED ? AUTH_BYPASS_USER : (session ? findUser(session.username) : null);
 
     if (req.method === "POST" && url.pathname === "/api/login") {
@@ -199,8 +223,8 @@ const server = http.createServer(async (req, res) => {
       if (AUTH_DISABLED) {
         return sendJson(res, 200, { ok: true, user: sanitizeUser(AUTH_BYPASS_USER) });
       }
-      if (cookies.phonefarm_session) {
-        sessions.delete(cookies.phonefarm_session);
+      if (cookies.routerfarm_session) {
+        sessions.delete(cookies.routerfarm_session);
       }
       return sendJson(res, 200, { ok: true }, [expireSessionCookie()]);
     }
@@ -249,18 +273,26 @@ const server = http.createServer(async (req, res) => {
 
     const routerMatch = url.pathname.match(/^\/api\/routers\/([^/]+)\/([^/]+)$/);
     if (req.method === "POST" && routerMatch) {
-      const routerId = decodeURIComponent(routerMatch[1]);
-      const action = routerMatch[2];
-      const body = await readJsonBody(req);
-      return handleRouterAction(res, user, routerId, action, body);
+      try {
+        const routerId = sanitizeRouterId(decodeURIComponent(routerMatch[1]));
+        const action = sanitizeAction(routerMatch[2]);
+        const body = await readJsonBody(req);
+        return handleRouterAction(res, user, routerId, action, body);
+      } catch (validationError) {
+        return sendJson(res, 400, { error: validationError.message });
+      }
     }
 
     const match = url.pathname.match(/^\/api\/devices\/([^/]+)\/([^/]+)$/);
     if (req.method === "POST" && match) {
-      const serial = decodeURIComponent(match[1]);
-      const action = match[2];
-      const body = await readJsonBody(req);
-      return handleDeviceAction(res, user, serial, action, body);
+      try {
+        const serial = sanitizeSerial(decodeURIComponent(match[1]));
+        const action = sanitizeAction(match[2]);
+        const body = await readJsonBody(req);
+        return handleDeviceAction(res, user, serial, action, body);
+      } catch (validationError) {
+        return sendJson(res, 400, { error: validationError.message });
+      }
     }
 
     return serveStatic(url.pathname, res);
@@ -445,15 +477,21 @@ function verifyPassword(password, storedHash) {
 }
 
 function createSessionCookie(token) {
-  return `phonefarm_session=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${SESSION_TTL_MS / 1000}`;
+  return `routerfarm_session=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${SESSION_TTL_MS / 1000}`;
 }
 
 function expireSessionCookie() {
-  return "phonefarm_session=; HttpOnly; Path=/; SameSite=Strict; Max-Age=0";
+  return "routerfarm_session=; HttpOnly; Path=/; SameSite=Strict; Max-Age=0";
 }
 
 function handleLogin(res, body) {
-  const username = String(body.username || "").trim();
+  let username;
+  try {
+    username = sanitizeUsername(body.username);
+  } catch (_e) {
+    logActivity("auth", "Failed login attempt for invalid username");
+    return sendJson(res, 401, { error: "Invalid username or password" });
+  }
   const password = String(body.password || "");
   const user = findUser(username);
   if (!user || !verifyPassword(password, user.passwordHash)) {
@@ -461,7 +499,7 @@ function handleLogin(res, body) {
     return sendJson(res, 401, { error: "Invalid username or password" });
   }
 
-  const token = crypto.randomBytes(32).toString("hex");
+  const token = generateToken();
   sessions.set(token, {
     username: user.username,
     expiresAt: Date.now() + SESSION_TTL_MS

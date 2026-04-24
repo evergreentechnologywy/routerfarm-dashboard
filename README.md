@@ -1,78 +1,41 @@
-# RouterFarm Dashboard
+# RouterFarm Dashboard v2.0.0
 
-RouterFarm is a native Windows 11 dashboard for a router-controlled Android farm. It starts from the working PhoneFarm codebase, but operates as a separate project focused on router-managed IP rotation and session control.
+RouterFarm is a native Windows 11 dashboard for a router-controlled Android farm. It evolved from the PhoneFarm codebase and is now a separate project focused on router-managed IP rotation and session control.
 
-This fork is designed for:
+This release is **v2.0.0** — a major step forward in security, input validation, and maintainability.
+
+## Designed For
 
 - 15 GL.iNet Opal routers
-- up to 4 permanently assigned phones per router
-- only 1 phone active per router at a time
-- only 1 active phone across the whole dashboard at a time
-- remote router actions, phone-to-router connect actions, and uplink IP reset workflows
+- Up to 4 permanently assigned phones per router
+- Only 1 phone active per router at a time
+- Only 1 active phone across the whole dashboard at a time
+- Remote router actions, phone-to-router connect actions, and uplink IP reset workflows
 
-## Current Fork Status
+## What's New in v2.0.0
 
-This branch is the first Opal-focused foundation, not the finished production build yet.
-
-Implemented in this fork:
-
-- renamed desktop/package identity to `RouterFarm`
-- new `config/routers.json` with 15 Opal router records
-- device model extended with `routerId` and `routerSlot`
-- router-aware `/api/status` payload with router summaries
-- backend enforcement for single active device globally
-- backend enforcement for router assignment before session activation
-- router API endpoints for:
-  - `router-health`
-  - `wan-reconnect`
-  - `restart-wifi`
-  - `cycle-uplink`
-- phone action endpoints for:
-  - `connect-router`
-  - `reset-uplink-ip`
-- new PowerShell scripts for router SSH actions and phone-to-router Wi-Fi connect attempts
-- UI section for Opal routers and new device actions
-
-Still intentionally incomplete:
-
-- production-grade GL.iNet authentication and provisioning
-- confirmed SSH key rollout to every router
-- fully reliable Android Wi-Fi join flow on every device/ROM
-- real power relay or smart outlet integration for uplink power cycling
-- router health polling beyond on-demand actions
-
-## Setup
-
-1. Copy config templates:
-   ```powershell
-   copy config\settings.template.json config\settings.json
-   copy config\devices.template.json config\devices.json
-   copy config\routers.template.json config\routers.json
-   copy config\users.template.json config\users.json
-   ```
-2. Edit `config\settings.json` with your local `adb.exe` and `scrcpy.exe` paths.
-3. Run deployment:
-   ```powershell
-   .\deploy-routerfarm.ps1
-   ```
+- **Input validation layer** — All API parameters (serials, router IDs, actions, usernames) are strictly validated. Invalid inputs are rejected with HTTP 400 before reaching scripts or the file system.
+- **Path traversal protection** — Malicious path segments (`..`, absolute paths, drive prefixes) are blocked.
+- **Security hardening** — Session cookie renamed to `routerfarm_session`, Electron IPC channels renamed to `routerfarm:*`, and the `AUTH_DISABLED` initialization order bug is fixed.
+- **Modular utilities** — New `lib/validation.js`, `lib/security.js`, and `lib/process-runner.js` libraries for cleaner, reusable code.
+- **CI/CD** — GitHub Actions workflow for automated testing and desktop builds.
 
 ## Folder Layout
 
-- `config/settings.json`
-- `config/devices.json`
-- `config/routers.json`
-- `config/state.json`
-- `scripts/invoke-routerfarm-router-action.ps1`
-- `scripts/connect-phone-to-router.ps1`
-- `scripts/cycle-mobile-uplink.ps1`
-- `web/`
-- `electron/`
+- `server.js` — Main HTTP server and API dispatcher
+- `lib/` — Shared JavaScript utilities (routing, validation, security, process runners)
+- `config/settings.json` — Runtime configuration
+- `config/devices.json` — Device records
+- `config/routers.json` — Router records
+- `scripts/` — PowerShell automation scripts
+- `web/` — Vanilla HTML/JS/CSS frontend
+- `electron/` — Desktop shell wrapper
 
 ## Config Model
 
 ### Routers
 
-`config/routers.json` now defines the Opal layer:
+`config/routers.json` defines the Opal layer:
 
 ```json
 {
@@ -98,7 +61,7 @@ Still intentionally incomplete:
 
 ### Devices
 
-Each phone can now be pinned to a router slot:
+Each phone can be pinned to a router slot:
 
 ```json
 {
@@ -120,7 +83,7 @@ Each phone can now be pinned to a router slot:
 
 ### Router actions
 
-The backend now exposes:
+The backend exposes:
 
 - `POST /api/routers/:routerId/router-health`
 - `POST /api/routers/:routerId/wan-reconnect`
@@ -130,11 +93,11 @@ The backend now exposes:
 Current transport assumption:
 
 - SSH into the Opal router
-- execute OpenWrt/GL.iNet compatible commands such as `ubus call system board`, `wifi reload`, `ifup wan`, and `reboot`
+- Execute OpenWrt/GL.iNet compatible commands such as `ubus call system board`, `wifi reload`, `ifup wan`, and `reboot`
 
 ### Phone actions
 
-The backend now exposes:
+The backend exposes:
 
 - `POST /api/devices/:serial/connect-router`
 - `POST /api/devices/:serial/reset-uplink-ip`
@@ -146,14 +109,14 @@ The backend now exposes:
 This fork assumes each Opal can be managed remotely either by:
 
 - SSH with a key already deployed to the router
-- or another non-interactive admin path you will wire in later
+- Or another non-interactive admin path you will wire in later
 
 For IP reset by power cycling the mobile USB router, this fork currently stops at the orchestration layer. You still need one real controllable power primitive per uplink, for example:
 
 - USB relay
-- managed smart plug
-- programmable PDU
-- another host-side commandable switch path
+- Managed smart plug
+- Programmable PDU
+- Another host-side commandable switch path
 
 `cycle-mobile-uplink.ps1` is intentionally a placeholder until that hardware path is defined.
 
@@ -175,6 +138,18 @@ Seed router assignments automatically:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\seed-routerfarm-assignments.ps1
 ```
 
+## Testing
+
+```powershell
+npm run test:unit
+```
+
+## Building
+
+```powershell
+npm run dist:desktop
+```
+
 ## Next implementation priorities
 
 1. Provision Opal SSH keys and confirm non-interactive router control on all 15.
@@ -182,3 +157,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\seed-routerfarm-assi
 3. Add a real uplink power controller implementation.
 4. Add router polling and WAN/IP telemetry to the dashboard.
 5. Add assignment editing in the UI for router slots.
+6. Extract shared PowerShell module to eliminate script duplication.
+7. Migrate backend to TypeScript.

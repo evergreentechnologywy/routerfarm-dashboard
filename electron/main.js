@@ -398,13 +398,13 @@ async function maybeRunDesktopTest(context) {
   });
 }
 
-ipcMain.handle("phonefarm:launch-viewer", async (_event, { serial }) => {
+ipcMain.handle("routerfarm:launch-viewer", async (_event, { serial }) => {
   const context = getWorkspaceContext();
   const scriptPath = path.join(context.root, "scripts", "open-scrcpy-for-device.ps1");
   return runPowerShellJson(scriptPath, ["-Serial", String(serial)]);
 });
 
-ipcMain.handle("phonefarm:sync-viewer-state", async (_event, payload) => {
+ipcMain.handle("routerfarm:sync-viewer-state", async (_event, payload) => {
   const context = getWorkspaceContext();
   const serial = String(payload?.serial || "");
   if (!serial) {
@@ -413,7 +413,7 @@ ipcMain.handle("phonefarm:sync-viewer-state", async (_event, payload) => {
   return postJson(`${context.baseUrl}/api/devices/${encodeURIComponent(serial)}/viewer-state`, payload);
 });
 
-ipcMain.handle("phonefarm:request-json", async (_event, request) => {
+ipcMain.handle("routerfarm:request-json", async (_event, request) => {
   const context = getWorkspaceContext();
   return requestJson(context, request);
 });
