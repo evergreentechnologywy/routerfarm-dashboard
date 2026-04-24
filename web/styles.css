@@ -177,6 +177,20 @@ select {
   letter-spacing: -0.03em;
 }
 
+.version-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--primary);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .nav-brand-mark {
   display: grid;
   place-items: center;
