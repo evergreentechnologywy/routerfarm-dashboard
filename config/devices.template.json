@@ -193,7 +193,7 @@
       "serial": "AC7BAAD5",
       "phoneNumber": 22,
       "nickname": "Victoria Liu",
-      "role": "sim-direct",
+      "role": "router-linkpro",
       "parentHotspotSerial": "",
       "routerId": "",
       "routerSlot": null
@@ -211,7 +211,7 @@
       "serial": "239EC6B6",
       "phoneNumber": 24,
       "nickname": "Phone 24",
-      "role": "sim-direct",
+      "role": "router-linkpro",
       "parentHotspotSerial": "",
       "routerId": "",
       "routerSlot": null

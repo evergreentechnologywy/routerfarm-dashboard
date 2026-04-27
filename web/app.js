@@ -405,7 +405,6 @@ function getHeroInsightsMetrics(data, visibleDevices) {
   });
   const blockedDevices = (visibleDevices || []).filter(device => shouldDisableAction(device, "start-session"));
   const routedDevices = (data?.devices || []).filter(device => normalizeRole(device.role) === "router-linkpro");
-  const simDirectDevices = (data?.devices || []).filter(device => normalizeRole(device.role) === "sim-direct");
   const noUplinkRouters = enabledRouters.filter(router => String(router.routerState?.tetheringState || "").toLowerCase() === "no-device").length;
   const apRouters = enabledRouters.filter(router => String(router.routerState?.routerMode || "").toLowerCase() === "ap").length;
   const unreachableRouters = enabledRouters.filter(router => {
@@ -418,7 +417,6 @@ function getHeroInsightsMetrics(data, visibleDevices) {
     readyRouters,
     blockedDevices,
     routedDevices,
-    simDirectDevices,
     noUplinkRouters,
     apRouters,
     unreachableRouters
@@ -433,7 +431,6 @@ function buildHeroInsightsSignature(data, visibleDevices) {
     metrics.readyRouters.length,
     metrics.blockedDevices.length,
     metrics.routedDevices.length,
-    metrics.simDirectDevices.length,
     metrics.noUplinkRouters,
     metrics.apRouters,
     metrics.unreachableRouters,
@@ -844,18 +841,16 @@ function renderHeroInsights(data, visibleDevices) {
       ? `Rack is reachable but not session-ready. ${metrics.apRouters} router(s) remain in AP mode, ${metrics.noUplinkRouters} report no USB uplink device, and ${metrics.unreachableRouters} are unreachable.`
       : blockedDevices.length > 0
         ? `${blockedDevices.length} phone(s) still need clearance before launch. Prioritize duplicate IP and activation lock issues.`
-        : `Rack is in a clean operator state. ${metrics.simDirectDevices.length} SIM-direct phone${metrics.simDirectDevices.length === 1 ? "" : "s"} stay outside routed prep while LinkPro phones wait for certified fresh IPs.`;
+        : `Rack is in a clean operator state. All phones use WiFi via LinkPro routers.`;
   setTextIfChanged(heroNarrative, narrative);
 }
 
 function buildSummaryStats(devices) {
   const routers = state.data?.routers || [];
   const routedDevices = devices.filter(device => normalizeRole(device.role) === "router-linkpro");
-  const simDirectDevices = devices.filter(device => normalizeRole(device.role) === "sim-direct");
   return [
     { label: "Fleet", value: devices.length, tone: "neutral", onClick: () => clearQuickFilters() },
     { label: "Router Pool", value: routers.length, tone: "neutral", onClick: () => focusSearch() },
-    { label: "SIM Direct", value: simDirectDevices.length, tone: "neutral", onClick: () => applyQuickFilter({ role: "sim-direct" }) },
     { label: "LinkPro Routed", value: routedDevices.length, tone: "info", onClick: () => applyQuickFilter({ role: "router-linkpro" }) },
     { label: "Online", value: devices.filter(device => device.online).length, tone: "success", onClick: () => applyQuickFilter({ status: "online" }) },
     { label: "Queued", value: devices.filter(device => device.prepState === "queued").length, tone: "warning", onClick: () => applyQuickFilter({ status: "queued" }) },

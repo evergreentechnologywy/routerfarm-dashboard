@@ -845,7 +845,7 @@ function getDeviceConfig(serial) {
       serial,
       phoneNumber: null,
       nickname: "",
-      role: "sim-direct",
+      role: "router-linkpro",
       parentHotspotSerial: "",
       routerId: "",
       routerSlot: null
@@ -918,8 +918,8 @@ function formatPhoneNumber(phoneNumber) {
 
 function normalizeDeviceRole(role) {
   const normalized = String(role || "").trim().toLowerCase();
-  if (!normalized || normalized === "sim-direct") {
-    return "sim-direct";
+  if (!normalized) {
+    return "router-linkpro";
   }
   if (["router-client", "opal-client", "router-linkpro", "linkpro-routed"].includes(normalized)) {
     return "router-linkpro";
