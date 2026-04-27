@@ -38,6 +38,7 @@ const {
   runProcess,
   parseJsonPayload
 } = require("./lib/process-runner");
+const { Watchdog, REPAIR_ACTIONS } = require("./lib/watchdog");
 
 const ROOT = __dirname;
 const CONFIG_DIR = path.join(ROOT, "config");
@@ -59,6 +60,7 @@ const ROUTERFARM_REMOTE_PREFIX = "/routerfarm";
 const WIN_ROOT = toWinPath(ROOT);
 const WIN_SCRIPTS_DIR = toWinPath(SCRIPTS_DIR);
 const WIN_SETTINGS_PATH = toWinPath(SETTINGS_PATH);
+const WIN_ROUTERS_CONFIG_PATH = toWinPath(ROUTERS_CONFIG_PATH);
 const WIN_ACTIVITY_LOG_PATH = toWinPath(ACTIVITY_LOG_PATH);
 
 let AUTH_DISABLED = false;
@@ -89,9 +91,9 @@ const DEFAULT_SETTINGS = {
     accountRefreshIntervalMs: 30000
   },
   prep: {
-    minWaitSeconds: 25,
-    maxWaitSeconds: 45,
-    onlineTimeoutSeconds: 90
+    minWaitSeconds: 8,
+    maxWaitSeconds: 15,
+    onlineTimeoutSeconds: 45
   },
   routerControl: {
     sshPath: "ssh",
@@ -100,6 +102,15 @@ const DEFAULT_SETTINGS = {
     commandTimeoutSeconds: 25,
     defaultPasswordEnvVar: "ROUTERFARM_ROUTER_PASSWORD",
     defaultHostKeys: {}
+  },
+  gatewayControl: {
+    host: "192.168.12.1",
+    port: 80,
+    adminUsername: "admin",
+    adminPasswordEnvVar: "ROUTERFARM_GATEWAY_PASSWORD",
+    apiBasePath: "/TMI/v1",
+    fallbackHosts: ["192.168.8.2"],
+    fallbackPorts: [8080]
   },
   uplinkControl: {
     powerCycleScriptPath: path.join(SCRIPTS_DIR, "cycle-mobile-uplink.ps1"),
@@ -168,6 +179,125 @@ let deviceRefreshInFlight = false;
 let lastRoutingAuditAt = 0;
 let stateSaveTimer = null;
 let routingAuditCache = null;
+
+const watchdog = new Watchdog({
+  intervalMs: 60000,
+  kimiApiKey: process.env.KIMI_API_KEY || settings.kimiApiKey || "",
+  kimiModel: settings.kimiModel || "kimi-latest"
+});
+
+function buildWatchdogContext() {
+  return {
+    reassignDevice(serial, toRouterId, toSlot) {
+      const cfg = devicesConfig.devices?.find(d => d.serial === serial);
+      if (!cfg) return false;
+      cfg.routerId = toRouterId;
+      cfg.routerSlot = toSlot;
+      saveDevicesConfig();
+      logActivity("watchdog", `Reassigned ${serial} to ${toRouterId} slot ${toSlot}`);
+      return true;
+    },
+    removeRouter(routerId, reason) {
+      const router = routersConfig.routers?.find(r => r.id === routerId);
+      if (!router) return false;
+      router.status = "missing";
+      router.note = reason || "Removed by watchdog";
+      saveRoutersConfig();
+      logActivity("watchdog", `Marked router ${routerId} as missing: ${reason}`);
+      return true;
+    },
+    clearPrepQueue() {
+      const cleared = (state.queue || []).length;
+      state.queue = [];
+      saveState();
+      logActivity("watchdog", `Cleared prep queue (${cleared} items)`);
+      return true;
+    },
+    updateRouterStatus(routerId, status, note) {
+      const router = routersConfig.routers?.find(r => r.id === routerId);
+      if (!router) return false;
+      router.status = status;
+      if (note) router.note = note;
+      saveRoutersConfig();
+      logActivity("watchdog", `Updated ${routerId} status to ${status}`);
+      return true;
+    },
+    runDeviceAction(serial, action) {
+      logActivity("watchdog", `Triggered ${action} on ${serial}`);
+      return true;
+    },
+    updateSetting(settingPath, value) {
+      const keys = String(settingPath).split(".");
+      let target = settings;
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!target[keys[i]]) target[keys[i]] = {};
+        target = target[keys[i]];
+      }
+      target[keys[keys.length - 1]] = value;
+      saveSettings();
+      logActivity("watchdog", `Updated setting ${settingPath}`);
+      return true;
+    }
+  };
+}
+
+watchdog.runCycle = async function() {
+  const report = this.buildSituationReport({
+    routers: routersConfig.routers || [],
+    devices: Object.values(deviceCache),
+    settings,
+    state,
+    queue: state.queue || [],
+    prepTelemetry: buildPrepTelemetry(Object.values(deviceCache))
+  });
+
+  this.appendLog({ level: "info", message: "Watchdog cycle started", report });
+
+  let plan;
+  let usedLocal = false;
+  try {
+    plan = await this.callKimi(report);
+  } catch (error) {
+    this.appendLog({ level: "warning", message: `Kimi API failed (${error.message}). Falling back to local diagnosis.` });
+    plan = this.localDiagnosis(report);
+    usedLocal = true;
+  }
+
+  const context = buildWatchdogContext();
+  const repairs = plan.repairs || [];
+
+  for (const repair of repairs) {
+    const actionMeta = REPAIR_ACTIONS[repair.action];
+    const isSafe = actionMeta?.safe || false;
+    const shouldAutoExecute = this.mode === "auto_all" || (this.mode === "auto_safe" && isSafe);
+
+    const suggestion = {
+      timestamp: new Date().toISOString(),
+      ...repair,
+      executed: false,
+      result: null,
+      source: usedLocal ? "local" : "kimi"
+    };
+
+    if (shouldAutoExecute) {
+      const result = await this.executeRepair(repair, context);
+      suggestion.executed = true;
+      suggestion.result = result;
+      this.recentActions.unshift(suggestion);
+      this.appendLog({ level: result.success ? "info" : "warning", message: result.message, repair });
+    } else {
+      this.suggestions.unshift(suggestion);
+      this.appendLog({ level: "info", message: `Suggestion: ${repair.reason} (${repair.action})`, repair });
+    }
+  }
+
+  // Deduplicate suggestions against recent actions
+  const executedKeys = new Set(this.recentActions.slice(0, 20).map(a => `${a.action}:${JSON.stringify(a.params)}`));
+  this.suggestions = this.suggestions.filter(s => !executedKeys.has(`${s.action}:${JSON.stringify(s.params)}`));
+
+  if (this.recentActions.length > 100) this.recentActions = this.recentActions.slice(0, 100);
+  if (this.suggestions.length > 100) this.suggestions = this.suggestions.slice(0, 100);
+};
 let routingAuditCacheMtimeMs = 0;
 let deviceIpHistory = loadJson(DEVICE_IP_HISTORY_PATH, DEFAULT_IP_HISTORY);
 const missingTools = new Set();
@@ -345,6 +475,56 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (req.method === "GET" && url.pathname === "/api/watchdog/status") {
+      return sendJson(res, 200, { ok: true, watchdog: watchdog.getStatus() });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/watchdog/mode") {
+      const body = await readJsonBody(req);
+      const newMode = String(body.mode || "off").trim();
+      const validModes = ["off", "suggest", "auto_safe", "auto_all"];
+      if (!validModes.includes(newMode)) {
+        return sendJson(res, 400, { error: `Invalid mode. Use: ${validModes.join(", ")}` });
+      }
+      watchdog.setMode(newMode);
+      logActivity("watchdog", `Mode changed to ${newMode} by ${user.username}`);
+      return sendJson(res, 200, { ok: true, watchdog: watchdog.getStatus() });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/watchdog/run") {
+      watchdog.tick();
+      logActivity("watchdog", `Manual run triggered by ${user.username}`);
+      return sendJson(res, 200, { ok: true, watchdog: watchdog.getStatus() });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/watchdog/approve") {
+      const body = await readJsonBody(req);
+      const index = parseInt(body.index, 10);
+      if (Number.isNaN(index) || index < 0 || index >= watchdog.suggestions.length) {
+        return sendJson(res, 400, { error: "Invalid suggestion index" });
+      }
+      const suggestion = watchdog.suggestions[index];
+      const context = buildWatchdogContext();
+      const result = await watchdog.executeRepair(suggestion, context);
+      suggestion.executed = true;
+      suggestion.result = result;
+      watchdog.recentActions.unshift(suggestion);
+      watchdog.suggestions.splice(index, 1);
+      logActivity("watchdog", `Approved repair: ${result.message} by ${user.username}`);
+      return sendJson(res, 200, { ok: true, result, watchdog: watchdog.getStatus() });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/watchdog/dismiss") {
+      const body = await readJsonBody(req);
+      const index = parseInt(body.index, 10);
+      if (Number.isNaN(index) || index < 0 || index >= watchdog.suggestions.length) {
+        return sendJson(res, 400, { error: "Invalid suggestion index" });
+      }
+      watchdog.suggestions.splice(index, 1);
+      logActivity("watchdog", `Suggestion dismissed by ${user.username}`);
+      return sendJson(res, 200, { ok: true, watchdog: watchdog.getStatus() });
+    }
+
     return serveStatic(url.pathname, res);
   } catch (error) {
     logActivity("error", `Request failed: ${error.message}`);
@@ -370,6 +550,10 @@ server.listen(settings.port, settings.host, () => {
   setTimeout(() => {
     refreshRouterHealth();
   }, 250);
+  if (settings.watchdogEnabled !== false && watchdog.kimiApiKey) {
+    watchdog.setMode(settings.watchdogMode || "suggest");
+    logActivity("system", `Watchdog started in ${watchdog.mode} mode`);
+  }
 });
 
 function cleanupPid() {
@@ -418,6 +602,17 @@ function saveState() {
   }, 150);
 }
 
+let refreshDevicesTimeout = null;
+function scheduleRefreshDevices() {
+  if (refreshDevicesTimeout) {
+    return;
+  }
+  refreshDevicesTimeout = setTimeout(() => {
+    refreshDevicesTimeout = null;
+    refreshDevices().catch(() => {});
+  }, 500);
+}
+
 function flushStateSave() {
   if (!stateSaveTimer) {
     return;
@@ -429,6 +624,14 @@ function flushStateSave() {
 
 function saveDevicesConfig() {
   fs.writeFileSync(DEVICES_CONFIG_PATH, `${JSON.stringify(devicesConfig, null, 2)}\n`);
+}
+
+function saveRoutersConfig() {
+  fs.writeFileSync(ROUTERS_CONFIG_PATH, `${JSON.stringify(routersConfig, null, 2)}\n`);
+}
+
+function saveSettings() {
+  fs.writeFileSync(SETTINGS_PATH, `${JSON.stringify(settings, null, 2)}\n`);
 }
 
 function saveDeviceIpHistory() {
@@ -956,7 +1159,8 @@ function buildStatus(user) {
     routingGuard,
     routers,
     devices: visibleDevices,
-    recentActivity: filterRecentActivityForUser(user)
+    recentActivity: filterRecentActivityForUser(user),
+    watchdog: watchdog.getStatus()
   };
 }
 
@@ -1375,7 +1579,7 @@ async function executeRouterActionAsync(routerId, action, body) {
   const scriptName = action === "cycle-uplink" ? "cycle-mobile-uplink.ps1" : "invoke-routerfarm-router-action.ps1";
   const args = action === "cycle-uplink"
     ? ["-RouterId", routerId, "-PowerCycleSeconds", String(Number(body?.powerCycleSeconds) || settings.uplinkControl?.defaultPowerCycleSeconds || 12)]
-    : ["-RouterId", routerId, "-Action", action, "-RoutersPath", ROUTERS_CONFIG_PATH, "-SettingsPath", SETTINGS_PATH];
+    : ["-RouterId", routerId, "-Action", action, "-RoutersPath", WIN_ROUTERS_CONFIG_PATH, "-SettingsPath", WIN_SETTINGS_PATH];
 
   const script = await runProcess("powershell.exe", [
     "-NoProfile",
@@ -1432,7 +1636,7 @@ async function connectPhoneToRouterAsync(serial, router) {
     "-ExecutionPolicy",
     "Bypass",
     "-File",
-    path.join(SCRIPTS_DIR, "connect-phone-to-router.ps1"),
+    path.join(WIN_SCRIPTS_DIR, "connect-phone-to-router.ps1"),
     "-Serial",
     serial,
     "-Ssid",
@@ -1442,7 +1646,7 @@ async function connectPhoneToRouterAsync(serial, router) {
     "-SettingsPath",
     WIN_SETTINGS_PATH
   ], {
-    cwd: WIN_ROOT,
+    cwd: ROOT,
     windowsHide: true,
     timeoutMs: 120000
   });
@@ -1472,7 +1676,7 @@ async function setDeviceWifiStateAsync(serial, enabled) {
     "-SettingsPath",
     WIN_SETTINGS_PATH
   ], {
-    cwd: WIN_ROOT,
+    cwd: ROOT,
     windowsHide: true,
     timeoutMs: 20000
   });
@@ -1689,7 +1893,7 @@ function updateDeviceState(serial, patch) {
   const current = state.devices[serial] || {};
   state.devices[serial] = { ...current, ...patch, updatedAt: new Date().toISOString() };
   saveState();
-  refreshDevices();
+  scheduleRefreshDevices();
 }
 
 async function refreshDevices() {
@@ -1888,8 +2092,14 @@ async function refreshRouterHealth() {
 
   routerHealthRefreshInFlight = true;
   try {
-    const routers = listConfiguredRouters();
-    const results = await Promise.all(routers.map(probeRouterHealth));
+    const routers = listConfiguredRouters().filter(router => router.enabled !== false);
+    const results = [];
+    const concurrency = 3;
+    for (let i = 0; i < routers.length; i += concurrency) {
+      const batch = routers.slice(i, i + concurrency);
+      const batchResults = await Promise.all(batch.map(probeRouterHealth));
+      results.push(...batchResults);
+    }
     for (const result of results) {
       const current = state.routers?.[result.id] || {};
       state.routers[result.id] = {
@@ -2570,7 +2780,7 @@ async function performDevicePublicIpCheck(serial, reason) {
   const deviceState = state.devices?.[serial] || {};
   const history = ensureDeviceIpHistory(serial);
   const ipPolicy = getIpReusePolicy();
-  const helperResult = spawnSync("powershell.exe", [
+  const helperResult = await runProcess("powershell.exe", [
     "-NoProfile",
     "-ExecutionPolicy",
     "Bypass",
@@ -2581,11 +2791,10 @@ async function performDevicePublicIpCheck(serial, reason) {
     "-SettingsPath",
     WIN_SETTINGS_PATH
   ], {
-    cwd: WIN_ROOT,
-    encoding: "utf8",
+    cwd: ROOT,
     windowsHide: true,
-      timeout: 70000
-    });
+    timeoutMs: 70000
+  });
 
   let helperPayload;
   let resolvedIp = "";
@@ -2769,7 +2978,29 @@ function processPrepQueue() {
     { detached: false }
   );
 
+  const PREP_TIMEOUT_MS = 480000;
+  let prepExitHandled = false;
+  const prepTimeout = setTimeout(() => {
+    if (prepExitHandled) return;
+    prepExitHandled = true;
+    try { child.kill(); } catch (_e) { /* ignore */ }
+    const prepFinishedAt = new Date().toISOString();
+    const prepDurationMs = Math.max(0, new Date(prepFinishedAt).getTime() - new Date(prepStartedAt).getTime());
+    updateDeviceState(serial, {
+      prepState: "failed",
+      prepMessage: "Prep timed out after 8 minutes",
+      prepFinishedAt,
+      lastPrepDurationMs: prepDurationMs
+    });
+    logActivity("queue", `Prep timed out after ${formatDuration(prepDurationMs)}`, serial);
+    preparingSerial = null;
+    processPrepQueue();
+  }, PREP_TIMEOUT_MS);
+
   child.on("error", error => {
+    clearTimeout(prepTimeout);
+    if (prepExitHandled) return;
+    prepExitHandled = true;
     updateDeviceState(serial, {
       prepState: "failed",
       prepMessage: `Prep failed to start: ${error.message}`,
@@ -2781,6 +3012,9 @@ function processPrepQueue() {
   });
 
   child.on("exit", code => {
+    clearTimeout(prepTimeout);
+    if (prepExitHandled) return;
+    prepExitHandled = true;
     const success = code === 0;
     const prepFinishedAt = new Date().toISOString();
     const prepDurationMs = Math.max(0, new Date(prepFinishedAt).getTime() - new Date(prepStartedAt).getTime());
@@ -2797,7 +3031,7 @@ function processPrepQueue() {
       });
     }
     preparingSerial = null;
-    refreshDevices();
+    scheduleRefreshDevices();
     processPrepQueue();
   });
 }
@@ -3301,5 +3535,3 @@ function runPowerShellScript(scriptName, scriptArgs = [], options) {
 
   return child;
 }
-
-

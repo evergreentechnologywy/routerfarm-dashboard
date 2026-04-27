@@ -20,6 +20,7 @@ const state = {
     serial: null,
     saving: false
   },
+  consecutiveRefreshErrors: 0,
   renderCache: {
     heroGuard: "",
     heroInsights: "",
@@ -57,8 +58,10 @@ const heroTertiaryNote = document.getElementById("heroTertiaryNote");
 const statsGrid = document.getElementById("statsGrid");
 const routersTabButton = document.getElementById("routersTabButton");
 const devicesTabButton = document.getElementById("devicesTabButton");
+const watchdogTabButton = document.getElementById("watchdogTabButton");
 const routersWorkspace = document.getElementById("routersWorkspace");
 const devicesWorkspace = document.getElementById("devicesWorkspace");
+const watchdogWorkspace = document.getElementById("watchdogWorkspace");
 const rackOverviewBadge = document.getElementById("rackOverviewBadge");
 const rackOverviewGrid = document.getElementById("rackOverviewGrid");
 const deviceCount = document.getElementById("deviceCount");
@@ -73,6 +76,15 @@ const lastCompletedPrep = document.getElementById("lastCompletedPrep");
 const lastCompletedPrepMeta = document.getElementById("lastCompletedPrepMeta");
 const queueList = document.getElementById("queueList");
 const activityList = document.getElementById("activityList");
+const watchdogModeSelect = document.getElementById("watchdogModeSelect");
+const watchdogRunButton = document.getElementById("watchdogRunButton");
+const watchdogStatusBadge = document.getElementById("watchdogStatusBadge");
+const watchdogLastRun = document.getElementById("watchdogLastRun");
+const watchdogLogSize = document.getElementById("watchdogLogSize");
+const watchdogSuggestionCount = document.getElementById("watchdogSuggestionCount");
+const watchdogActionCount = document.getElementById("watchdogActionCount");
+const watchdogSuggestions = document.getElementById("watchdogSuggestions");
+const watchdogRecentActions = document.getElementById("watchdogRecentActions");
 const routingStatusBadge = document.getElementById("routingStatusBadge");
 const routingSummary = document.getElementById("routingSummary");
 const routingPaths = document.getElementById("routingPaths");
@@ -109,6 +121,7 @@ const editorRouterSlot = document.getElementById("editorRouterSlot");
 const editorParentHotspotSerial = document.getElementById("editorParentHotspotSerial");
 
 let searchDebounce = 0;
+let pendingViewportRestore = null;
 
 window.addEventListener("error", event => {
   reportClientError({
@@ -129,6 +142,29 @@ window.addEventListener("unhandledrejection", event => {
 
 logoutButton.addEventListener("click", handleLogout);
 refreshButton.addEventListener("click", () => refresh(true));
+
+watchdogModeSelect?.addEventListener("change", async event => {
+  const mode = event.target.value;
+  try {
+    await apiRequest("/api/watchdog/mode", {
+      method: "POST",
+      body: JSON.stringify({ mode })
+    });
+    await refresh();
+  } catch (error) {
+    console.error("Failed to set watchdog mode:", error);
+  }
+});
+
+watchdogRunButton?.addEventListener("click", async () => {
+  try {
+    await apiRequest("/api/watchdog/run", { method: "POST" });
+    await refresh();
+  } catch (error) {
+    console.error("Failed to run watchdog:", error);
+  }
+});
+
 searchInput.addEventListener("input", event => {
   clearTimeout(searchDebounce);
   searchDebounce = setTimeout(() => {
@@ -154,6 +190,7 @@ readyOnlyToggle.addEventListener("change", event => {
 });
 routersTabButton?.addEventListener("click", () => setActiveTab("routers"));
 devicesTabButton?.addEventListener("click", () => setActiveTab("devices"));
+watchdogTabButton?.addEventListener("click", () => setActiveTab("watchdog"));
 cardViewButton.addEventListener("click", () => setViewMode("cards"));
 tableViewButton.addEventListener("click", () => setViewMode("table"));
 showAllButton.addEventListener("click", () => clearQuickFilters());
@@ -177,11 +214,24 @@ deviceEditorForm?.addEventListener("submit", async event => {
 render();
 refresh();
 
+let lastRefreshAttempt = 0;
 setInterval(() => {
   if (state.user && !document.hidden) {
+    const interval = getPollInterval();
+    const now = Date.now();
+    if (now - lastRefreshAttempt < interval) {
+      return;
+    }
+    lastRefreshAttempt = now;
     refresh(false);
   }
 }, 4000);
+
+function getPollInterval() {
+  const base = 4000;
+  const factor = Math.min(state.consecutiveRefreshErrors, 6);
+  return base * (factor > 0 ? factor : 1);
+}
 
 setInterval(() => {
   liveClock.textContent = formatNow();
@@ -192,6 +242,7 @@ async function refresh(showToast = false) {
     return;
   }
 
+  lastRefreshAttempt = Date.now();
   state.refreshInFlight = true;
   try {
     await ensureUserLoaded();
@@ -202,6 +253,7 @@ async function refresh(showToast = false) {
     }
 
     state.data = response.payload;
+    state.consecutiveRefreshErrors = 0;
     render();
 
     if (showToast) {
@@ -211,6 +263,7 @@ async function refresh(showToast = false) {
       }, 800);
     }
   } catch (error) {
+    state.consecutiveRefreshErrors++;
     if (showToast || !state.data) {
       window.alert(error.message || "Dashboard refresh failed.");
     } else {
@@ -257,7 +310,8 @@ function setViewMode(mode) {
 }
 
 function setActiveTab(tab) {
-  state.activeTab = tab === "devices" ? "devices" : "routers";
+  const validTabs = ["routers", "devices", "watchdog"];
+  state.activeTab = validTabs.includes(tab) ? tab : "routers";
   syncTabState();
 }
 
@@ -383,8 +437,7 @@ function buildHeroInsightsSignature(data, visibleDevices) {
     metrics.noUplinkRouters,
     metrics.apRouters,
     metrics.unreachableRouters,
-    metrics.prepActive?.serial || "",
-    metrics.prepActive?.elapsedMs || 0
+    metrics.prepActive?.serial || ""
   ].join("|");
 }
 
@@ -441,10 +494,8 @@ function buildQueueSignature(data) {
     ...(data.queue || []),
     active?.serial || "",
     active?.startedAt || "",
-    active?.elapsedMs || 0,
     completed?.serial || "",
     completed?.finishedAt || "",
-    completed?.durationMs || 0,
     completed?.prepState || ""
   ].join("|");
 }
@@ -494,13 +545,10 @@ function buildDeviceSignature(device) {
     device.routerSsid || "",
     device.sessionState || "",
     device.prepState || "",
-    device.prepElapsedMs || 0,
-    device.queueWaitMs || 0,
     device.lastPrepDurationMs || 0,
     device.prepMessage || "",
     device.publicIp?.currentIp || "",
     device.publicIp?.status || "",
-    device.publicIp?.lastCheckedAt || "",
     device.publicIp?.location?.city || "",
     device.publicIp?.location?.region || "",
     device.publicIp?.location?.country || "",
@@ -515,7 +563,6 @@ function buildDeviceSignature(device) {
     device.activationLock?.reason || "",
     device.viewerLaunch?.status || "",
     device.viewerLaunch?.pid || "",
-    device.viewerLaunch?.requestedAt || "",
     device.viewerLaunch?.confirmedAt || "",
     device.viewerLaunch?.lastError || ""
   ].join("~");
@@ -560,6 +607,7 @@ function createEmptyStateElement(tagName, className, text, colSpan = 0) {
 }
 
 function render() {
+  const viewport = captureViewport();
   appShell.hidden = false;
   appShell.classList.toggle("table-mode", state.viewMode === "table");
   syncTabState();
@@ -629,6 +677,76 @@ function render() {
     renderDeviceViews(visibleDevices);
     state.renderCache.deviceViews = deviceViewsSignature;
   }
+  renderWatchdogPanel(data.watchdog);
+  updateVolatilePanels(data, visibleDevices);
+  restoreViewport(viewport);
+}
+
+function updateVolatilePanels(data, visibleDevices) {
+  const prepTelemetry = data.prepTelemetry || {};
+  const prepActive = prepTelemetry.active;
+
+  // Update hero insights prep active timer
+  if (heroTertiaryValue && heroTertiaryNote) {
+    setTextIfChanged(heroTertiaryValue, prepActive ? formatDeviceName(getDeviceBySerial(prepActive.serial) || prepActive) : "Idle");
+    setTextIfChanged(
+      heroTertiaryNote,
+      prepActive
+        ? `Prep active for ${formatDuration(prepActive.elapsedMs || 0)} on ${prepActive.serial}.`
+        : "No active prep worker is running."
+    );
+  }
+
+  // Update queue panel active prep countdown
+  if (activePrepDevice && activePrepCountdown && activePrepProgressBar) {
+    if (prepActive) {
+      setTextIfChanged(activePrepDevice, prepActive.label || prepActive.serial);
+      setTextIfChanged(activePrepCountdown, `Elapsed ${formatDuration(prepActive.elapsedMs)} | Started ${formatShortTime(prepActive.startedAt)}`);
+      syncProgressBar(activePrepProgressBar, computePrepProgress(prepActive.elapsedMs, "preparing"));
+    } else {
+      setTextIfChanged(activePrepDevice, "Idle");
+      setTextIfChanged(activePrepCountdown, "No active prep worker");
+      syncProgressBar(activePrepProgressBar, 0);
+    }
+  }
+
+  // Update queue list wait times without full rebuild
+  if (queueList && data.queue && data.queue.length > 0) {
+    const devicesBySerial = new Map((data.devices || []).map(device => [device.serial, device]));
+    const items = queueList.querySelectorAll(".queue-item");
+    items.forEach((item, index) => {
+      const serial = data.queue[index];
+      if (!serial) return;
+      const device = devicesBySerial.get(serial);
+      const label = device ? formatDeviceName(device) : serial;
+      const waitMs = device?.queueWaitMs || 0;
+      const newHtml = `<strong>${index + 1}. ${escapeHtml(label)}</strong><small>${escapeHtml(serial)} | Waiting ${escapeHtml(formatDuration(waitMs))}</small>`;
+      if (item.innerHTML !== newHtml) {
+        item.innerHTML = newHtml;
+      }
+    });
+  }
+}
+
+function captureViewport() {
+  return {
+    left: window.scrollX,
+    top: window.scrollY
+  };
+}
+
+function restoreViewport(viewport) {
+  if (!viewport) {
+    return;
+  }
+  pendingViewportRestore = viewport;
+  requestAnimationFrame(() => {
+    if (!pendingViewportRestore || pendingViewportRestore !== viewport) {
+      return;
+    }
+    window.scrollTo(viewport.left, viewport.top);
+    pendingViewportRestore = null;
+  });
 }
 
 function buildEmptyData() {
@@ -645,7 +763,9 @@ function buildEmptyData() {
 }
 
 function syncControls() {
-  searchInput.value = state.filters.search || "";
+  if (document.activeElement !== searchInput) {
+    searchInput.value = state.filters.search || "";
+  }
   statusFilter.value = state.filters.status;
   roleFilter.value = state.filters.role;
   warningsOnlyToggle.checked = state.filters.warningsOnly;
@@ -654,21 +774,31 @@ function syncControls() {
 
 function syncTabState() {
   const routersActive = state.activeTab === "routers";
+  const devicesActive = state.activeTab === "devices";
+  const watchdogActive = state.activeTab === "watchdog";
   if (routersTabButton) {
     routersTabButton.classList.toggle("is-active", routersActive);
     routersTabButton.setAttribute("aria-selected", routersActive ? "true" : "false");
   }
   if (devicesTabButton) {
-    devicesTabButton.classList.toggle("is-active", !routersActive);
-    devicesTabButton.setAttribute("aria-selected", routersActive ? "false" : "true");
+    devicesTabButton.classList.toggle("is-active", devicesActive);
+    devicesTabButton.setAttribute("aria-selected", devicesActive ? "true" : "false");
+  }
+  if (watchdogTabButton) {
+    watchdogTabButton.classList.toggle("is-active", watchdogActive);
+    watchdogTabButton.setAttribute("aria-selected", watchdogActive ? "true" : "false");
   }
   if (routersWorkspace) {
     routersWorkspace.hidden = !routersActive;
     routersWorkspace.classList.toggle("is-active", routersActive);
   }
   if (devicesWorkspace) {
-    devicesWorkspace.hidden = routersActive;
-    devicesWorkspace.classList.toggle("is-active", !routersActive);
+    devicesWorkspace.hidden = !devicesActive;
+    devicesWorkspace.classList.toggle("is-active", devicesActive);
+  }
+  if (watchdogWorkspace) {
+    watchdogWorkspace.hidden = !watchdogActive;
+    watchdogWorkspace.classList.toggle("is-active", watchdogActive);
   }
 }
 
@@ -1083,6 +1213,38 @@ function renderDeviceViews(devices = filterDevices((state.data?.devices) || []))
   }
 }
 
+function updateDeviceCardVolatileFields(device, card) {
+  const prepTimerValue = card.querySelector(".prep-timer-value");
+  const prepProgressBar = card.querySelector(".prep-progress-bar");
+  const lastCheckedValue = card.querySelector(".last-checked-value");
+  const viewerLaunchValue = card.querySelector(".viewer-launch-value");
+  const prepMessageState = card.querySelector(".state-prep-message");
+  const prepBadge = card.querySelector(".prep-badge");
+  const sessionValue = card.querySelector(".session-value");
+  if (prepTimerValue) {
+    prepTimerValue.textContent = formatPrepTimer(device);
+  }
+  if (prepProgressBar) {
+    syncProgressBar(prepProgressBar, computePrepProgress(device.prepElapsedMs || device.queueWaitMs || 0, device.prepState));
+  }
+  if (lastCheckedValue) {
+    lastCheckedValue.textContent = device.publicIp?.lastCheckedAt ? formatIpLastChecked(device.publicIp) : (formatIpTimezone(device.publicIp) || "-");
+  }
+  if (viewerLaunchValue) {
+    viewerLaunchValue.textContent = formatViewerLaunch(device.viewerLaunch);
+  }
+  if (prepMessageState) {
+    prepMessageState.textContent = device.prepMessage || "No prep message";
+  }
+  if (prepBadge) {
+    prepBadge.textContent = (device.prepState || "idle").toUpperCase();
+    prepBadge.className = `badge prep-badge ${prepBadgeClass(device.prepState)}`;
+  }
+  if (sessionValue) {
+    sessionValue.textContent = formatSession(device.sessionState);
+  }
+}
+
 function renderCardView(devices) {
   const safeDevices = (devices || []).filter(Boolean);
   if (!safeDevices.length) {
@@ -1096,12 +1258,54 @@ function renderCardView(devices) {
     const signature = buildDeviceSignature(device);
     const existing = existingCards.get(device.serial);
     if (existing && existing.dataset.renderSig === signature) {
+      updateDeviceCardVolatileFields(device, existing);
       fragment.appendChild(existing);
       continue;
     }
     fragment.appendChild(createDeviceCardElement(device, signature));
   }
   cardView.replaceChildren(fragment);
+}
+
+function updateDeviceTableRowVolatileFields(device, row) {
+  const prepCell = row.querySelector(".cell-prep-state");
+  const progressCell = row.querySelector(".cell-prep-progress");
+  const lastCheckedCell = row.querySelector(".cell-last-checked");
+  const actionsCell = row.querySelector(".cell-actions");
+  if (prepCell) {
+    prepCell.innerHTML = `${renderBadgeMarkup((device.prepState || "idle").toUpperCase(), prepBadgeClass(device.prepState))}<div class="table-subline">${escapeHtml(formatPrepTimer(device))}</div><div class="table-subline">${escapeHtml(formatViewerLaunch(device.viewerLaunch))}</div>`;
+  }
+  if (progressCell) {
+    progressCell.innerHTML = `
+      <div class="table-stack">
+        <strong>${escapeHtml(formatPrepProgressLabel(device))}</strong>
+        <div class="prep-progress prep-progress-compact" aria-hidden="true">
+          <div class="prep-progress-bar" style="width: ${computePrepProgress(device.prepElapsedMs || device.queueWaitMs || 0, device.prepState)}%"></div>
+        </div>
+      </div>`;
+  }
+  if (lastCheckedCell) {
+    lastCheckedCell.innerHTML = `
+      <div class="table-stack">
+        <strong>${escapeHtml(device.publicIp?.lastCheckedAt ? formatShortTime(device.publicIp.lastCheckedAt) : "-")}</strong>
+        <span class="table-subline">${escapeHtml(device.publicIp?.lastCheckedAt ? formatIpLastChecked(device.publicIp) : (formatIpTimezone(device.publicIp) || "No successful check"))}</span>
+      </div>`;
+  }
+  if (actionsCell) {
+    actionsCell.innerHTML = `
+      <div class="table-actions">
+        <button class="table-action" data-editor="true">Edit</button>
+        ${renderTableActionButton(device, "open-control", "Open")}
+        ${renderTableActionButton(device, "prep", "Prep", true)}
+        ${renderTableActionButton(device, "connect-router", "Connect")}
+        ${renderTableActionButton(device, "reset-uplink-ip", "Reset IP")}
+        ${renderTableActionButton(device, "engage-airplane", "Airplane")}
+        ${renderTableActionButton(device, "recover-radios", "Recover")}
+        ${renderTableActionButton(device, "check-ip", "IP")}
+        ${renderTableActionButton(device, "start-session", "Start")}
+        ${renderTableActionButton(device, "stop-session", "Stop")}
+      </div>`;
+  }
 }
 
 function renderTableView(devices) {
@@ -1117,6 +1321,7 @@ function renderTableView(devices) {
     const signature = buildDeviceSignature(device);
     const existing = existingRows.get(device.serial);
     if (existing && existing.dataset.renderSig === signature) {
+      updateDeviceTableRowVolatileFields(device, existing);
       fragment.appendChild(existing);
       continue;
     }
@@ -1180,8 +1385,8 @@ function createDeviceTableRow(device, signature = buildDeviceSignature(device)) 
       </div>
     </td>
     <td>${renderBadgeMarkup(formatSession(device.sessionState), sessionBadgeClass(device.sessionState))}</td>
-    <td>${renderBadgeMarkup((device.prepState || "idle").toUpperCase(), prepBadgeClass(device.prepState))}<div class="table-subline">${escapeHtml(formatPrepTimer(device))}</div><div class="table-subline">${escapeHtml(formatViewerLaunch(device.viewerLaunch))}</div></td>
-    <td>
+    <td class="cell-prep-state">${renderBadgeMarkup((device.prepState || "idle").toUpperCase(), prepBadgeClass(device.prepState))}<div class="table-subline">${escapeHtml(formatPrepTimer(device))}</div><div class="table-subline">${escapeHtml(formatViewerLaunch(device.viewerLaunch))}</div></td>
+    <td class="cell-prep-progress">
       <div class="table-stack">
         <strong>${escapeHtml(formatPrepProgressLabel(device))}</strong>
         <div class="prep-progress prep-progress-compact" aria-hidden="true">
@@ -1201,7 +1406,7 @@ function createDeviceTableRow(device, signature = buildDeviceSignature(device)) 
         <span class="table-subline">${escapeHtml(formatIpStatusSummary(device.publicIp))}</span>
       </div>
     </td>
-    <td>
+    <td class="cell-last-checked">
       <div class="table-stack">
         <strong>${escapeHtml(device.publicIp?.lastCheckedAt ? formatShortTime(device.publicIp.lastCheckedAt) : "-")}</strong>
         <span class="table-subline">${escapeHtml(device.publicIp?.lastCheckedAt ? formatIpLastChecked(device.publicIp) : (formatIpTimezone(device.publicIp) || "No successful check"))}</span>
@@ -1213,7 +1418,7 @@ function createDeviceTableRow(device, signature = buildDeviceSignature(device)) 
         <span class="table-subline">${escapeHtml(buildCompactWarning(device))}</span>
       </div>
     </td>
-    <td>
+    <td class="cell-actions">
       <div class="table-actions">
         <button class="table-action" data-editor="true">Edit</button>
         ${renderTableActionButton(device, "open-control", "Open")}
@@ -1769,6 +1974,109 @@ function formatDateTime(value) {
 function formatShortTime(value) {
   if (!value) return "-";
   return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+}
+
+function renderWatchdogPanel(watchdog) {
+  if (!watchdog) return;
+  const modeLabels = {
+    off: "Off",
+    suggest: "Suggest Only",
+    auto_safe: "Auto-Safe",
+    auto_all: "Auto-All"
+  };
+  setTextIfChanged(watchdogStatusBadge, modeLabels[watchdog.mode] || "Unknown");
+  watchdogStatusBadge.className = `count-pill ${watchdog.enabled ? (watchdog.mode === "auto_all" ? "badge-failed" : "badge-ready") : "badge-neutral"}`;
+  setTextIfChanged(watchdogLastRun, watchdog.lastRun ? formatShortTime(watchdog.lastRun) : "Never");
+  setTextIfChanged(watchdogLogSize, String(watchdog.logSize || 0));
+  setTextIfChanged(watchdogSuggestionCount, String(watchdog.suggestions?.length || 0));
+  setTextIfChanged(watchdogActionCount, String(watchdog.recentActions?.length || 0));
+
+  if (watchdogModeSelect && watchdogModeSelect.value !== watchdog.mode) {
+    watchdogModeSelect.value = watchdog.mode;
+  }
+
+  renderWatchdogSuggestions(watchdog.suggestions || []);
+  renderWatchdogActions(watchdog.recentActions || []);
+}
+
+function renderWatchdogSuggestions(suggestions) {
+  if (!watchdogSuggestions) return;
+  if (!suggestions.length) {
+    watchdogSuggestions.innerHTML = `<div class="empty-state">No pending suggestions.</div>`;
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  suggestions.forEach((s, index) => {
+    const item = document.createElement("div");
+    item.className = "watchdog-item";
+    item.innerHTML = `
+      <div class="watchdog-item-header">
+        <strong>${escapeHtml(s.action)}</strong>
+        <span class="badge ${s.safe ? 'badge-ready' : 'badge-failed'}">${s.safe ? 'Safe' : 'Requires Approval'}</span>
+      </div>
+      <p>${escapeHtml(s.reason || s.message || "No description")}</p>
+      <div class="watchdog-item-actions">
+        <button class="button button-primary" data-watchdog-approve="${index}" type="button">Approve</button>
+        <button class="button button-secondary" data-watchdog-dismiss="${index}" type="button">Dismiss</button>
+      </div>
+    `;
+    fragment.appendChild(item);
+  });
+  watchdogSuggestions.replaceChildren(fragment);
+
+  watchdogSuggestions.querySelectorAll("[data-watchdog-approve]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = parseInt(btn.dataset.watchdogApprove, 10);
+      try {
+        await apiRequest("/api/watchdog/approve", {
+          method: "POST",
+          body: JSON.stringify({ index: idx })
+        });
+        await refresh();
+      } catch (error) {
+        console.error("Failed to approve suggestion:", error);
+      }
+    });
+  });
+
+  watchdogSuggestions.querySelectorAll("[data-watchdog-dismiss]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = parseInt(btn.dataset.watchdogDismiss, 10);
+      try {
+        await apiRequest("/api/watchdog/dismiss", {
+          method: "POST",
+          body: JSON.stringify({ index: idx })
+        });
+        await refresh();
+      } catch (error) {
+        console.error("Failed to dismiss suggestion:", error);
+      }
+    });
+  });
+}
+
+function renderWatchdogActions(actions) {
+  if (!watchdogRecentActions) return;
+  if (!actions.length) {
+    watchdogRecentActions.innerHTML = `<div class="empty-state">No recent actions.</div>`;
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  actions.forEach(a => {
+    const item = document.createElement("div");
+    item.className = "watchdog-item";
+    const resultBadge = a.result?.success ? '<span class="badge badge-ready">Success</span>' : '<span class="badge badge-failed">Failed</span>';
+    item.innerHTML = `
+      <div class="watchdog-item-header">
+        <strong>${escapeHtml(a.action)}</strong>
+        ${resultBadge}
+        <small>${escapeHtml(a.timestamp ? formatShortTime(a.timestamp) : "")}</small>
+      </div>
+      <p>${escapeHtml(a.result?.message || a.reason || "No details")}</p>
+    `;
+    fragment.appendChild(item);
+  });
+  watchdogRecentActions.replaceChildren(fragment);
 }
 
 function formatNow() {

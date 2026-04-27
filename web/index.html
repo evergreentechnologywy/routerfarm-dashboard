@@ -44,6 +44,7 @@
               <div class="nav-pills" role="tablist" aria-label="RouterFarm workspaces">
                 <button id="routersTabButton" class="nav-pill is-active" type="button" role="tab" aria-selected="true">Routers</button>
                 <button id="devicesTabButton" class="nav-pill" type="button" role="tab" aria-selected="false">Devices</button>
+                <button id="watchdogTabButton" class="nav-pill" type="button" role="tab" aria-selected="false">Watchdog</button>
               </div>
             </div>
             <div class="nav-card">
@@ -274,6 +275,65 @@
                   </thead>
                   <tbody id="deviceTableBody"></tbody>
                 </table>
+              </div>
+            </section>
+          </section>
+
+          <section id="watchdogWorkspace" class="dashboard-workspace" aria-labelledby="watchdogTabButton" hidden>
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Kimi Watchdog</h2>
+                  <p class="panel-copy">Autonomous fleet monitor. The watchdog polls Kimi API to diagnose issues and can execute repairs automatically or suggest them for approval.</p>
+                </div>
+                <span id="watchdogStatusBadge" class="count-pill">Off</span>
+              </div>
+
+              <div class="watchdog-controls">
+                <label class="select-field">
+                  <span class="field-label">Mode</span>
+                  <select id="watchdogModeSelect">
+                    <option value="off">Off</option>
+                    <option value="suggest">Suggest Only</option>
+                    <option value="auto_safe">Auto-Safe Repairs</option>
+                    <option value="auto_all">Auto-All Repairs</option>
+                  </select>
+                </label>
+                <button id="watchdogRunButton" class="button button-primary" type="button">Run Now</button>
+              </div>
+
+              <div class="watchdog-metrics">
+                <div class="metric-card">
+                  <strong id="watchdogLastRun">Never</strong>
+                  <span>Last Run</span>
+                </div>
+                <div class="metric-card">
+                  <strong id="watchdogLogSize">0</strong>
+                  <span>Log Entries</span>
+                </div>
+                <div class="metric-card">
+                  <strong id="watchdogSuggestionCount">0</strong>
+                  <span>Pending Suggestions</span>
+                </div>
+                <div class="metric-card">
+                  <strong id="watchdogActionCount">0</strong>
+                  <span>Recent Actions</span>
+                </div>
+              </div>
+
+              <div class="watchdog-sections">
+                <div class="watchdog-section">
+                  <h3>Pending Suggestions</h3>
+                  <div id="watchdogSuggestions" class="watchdog-list">
+                    <div class="empty-state">No pending suggestions.</div>
+                  </div>
+                </div>
+                <div class="watchdog-section">
+                  <h3>Recent Actions</h3>
+                  <div id="watchdogRecentActions" class="watchdog-list">
+                    <div class="empty-state">No recent actions.</div>
+                  </div>
+                </div>
               </div>
             </section>
           </section>
