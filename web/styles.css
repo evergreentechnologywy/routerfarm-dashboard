@@ -1871,3 +1871,18 @@ h2 {
   display: flex;
   gap: 8px;
 }
+
+.watchdog-login-banner {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.watchdog-login-banner a {
+  color: #b45309;
+  font-weight: 600;
+  text-decoration: underline;
+}

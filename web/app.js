@@ -85,6 +85,8 @@ const watchdogSuggestionCount = document.getElementById("watchdogSuggestionCount
 const watchdogActionCount = document.getElementById("watchdogActionCount");
 const watchdogSuggestions = document.getElementById("watchdogSuggestions");
 const watchdogRecentActions = document.getElementById("watchdogRecentActions");
+const watchdogLoginUrl = document.getElementById("watchdogLoginUrl");
+const watchdogLoginButton = document.getElementById("watchdogLoginButton");
 const routingStatusBadge = document.getElementById("routingStatusBadge");
 const routingSummary = document.getElementById("routingSummary");
 const routingPaths = document.getElementById("routingPaths");
@@ -162,6 +164,15 @@ watchdogRunButton?.addEventListener("click", async () => {
     await refresh();
   } catch (error) {
     console.error("Failed to run watchdog:", error);
+  }
+});
+
+watchdogLoginButton?.addEventListener("click", async () => {
+  try {
+    await apiRequest("/api/watchdog/login", { method: "POST" });
+    await refresh();
+  } catch (error) {
+    console.error("Failed to trigger Kimi login:", error);
   }
 });
 
@@ -1988,6 +1999,24 @@ function renderWatchdogPanel(watchdog) {
 
   if (watchdogModeSelect && watchdogModeSelect.value !== watchdog.mode) {
     watchdogModeSelect.value = watchdog.mode;
+  }
+
+  if (watchdogLoginUrl) {
+    if (watchdog.kimiLoginUrl) {
+      watchdogLoginUrl.hidden = false;
+      const link = watchdogLoginUrl.querySelector("a");
+      if (link) {
+        link.href = watchdog.kimiLoginUrl;
+        link.textContent = watchdog.kimiLoginUserCode || "Authorize Kimi";
+      }
+    } else {
+      watchdogLoginUrl.hidden = true;
+    }
+  }
+
+  if (watchdogLoginButton) {
+    watchdogLoginButton.textContent = watchdog.kimiLoginInFlight ? "Login in progress..." : "Login to Kimi";
+    watchdogLoginButton.disabled = Boolean(watchdog.kimiLoginInFlight);
   }
 
   renderWatchdogSuggestions(watchdog.suggestions || []);

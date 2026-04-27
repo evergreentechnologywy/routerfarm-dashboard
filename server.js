@@ -525,6 +525,12 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true, watchdog: watchdog.getStatus() });
     }
 
+    if (req.method === "POST" && url.pathname === "/api/watchdog/login") {
+      const result = await watchdog.triggerKimiLogin();
+      logActivity("watchdog", `Kimi login triggered by ${user.username}: ${result.message}`);
+      return sendJson(res, 200, { ok: true, result, watchdog: watchdog.getStatus() });
+    }
+
     return serveStatic(url.pathname, res);
   } catch (error) {
     logActivity("error", `Request failed: ${error.message}`);
